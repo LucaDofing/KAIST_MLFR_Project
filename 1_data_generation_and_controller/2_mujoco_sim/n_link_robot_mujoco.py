@@ -59,60 +59,19 @@ def print_state(time, data, action):
           f"Torque1: {action[0]:10.2f}Nm | "
           f"Torque2: {action[1]:10.2f}Nm")
 
-def main():
-    parser = argparse.ArgumentParser(description="Run a simple MuJoCo simulation with the n_link_robot model")
-    parser.add_argument("--xml_path", type=str, default="4_data/1_xml_models/n_link_robot.xml",
-                      help="Path to the MuJoCo XML file")
-    parser.add_argument("--sim_time", type=float, default=2.0,
-                      help="Simulation time in seconds")
-    parser.add_argument("--control_mode", type=str, default="pd",
-                      choices=["random", "constant", "pd"],
-                      help="Control mode: random, constant, or pd")
-    parser.add_argument("--constant_torque", type=float, default=5.0,
-                      help="Torque value for constant control mode")
-    parser.add_argument("--target_angle", type=float, default=10.0,
-                      help="Target angle in degrees for PD control")
-    parser.add_argument("--kp", type=float, default=100.0,
-                      help="Position gain for PD control")
-    parser.add_argument("--kd", type=float, default=10.0,
-                      help="Velocity gain for PD control")
-    args = parser.parse_args()
-
-    # Load model and initialize simulation
-    global model  # Needed for visualization
-    model = load_model(args.xml_path)
-    data = init_simulation(model)
-    
+def run_simulation_with_rendering(model, data, controller, logger, args):
+    """Run simulation with visualization."""
     # Initialize visualization
     window, cam, opt, scene, context = init_visualization()
     if window is None:
         print("Failed to initialize visualization")
         return
-        
-    # Create controller-specific parameter dictionaries
-    controller_params = {}
-    if args.control_mode == "constant":
-        controller_params = {"constant_torque": args.constant_torque}
-    elif args.control_mode == "pd":
-        controller_params = {
-            "target_angle": np.deg2rad(args.target_angle),
-            "kp": args.kp,
-            "kd": args.kd
-        }
-    # Random controller doesn't need any parameters
-    
-    # Initialize controller
-    controller = create_controller(args.control_mode, model, data, **controller_params)
-    
-    # Initialize data logger
-    logger = DataLogger()
     
     # Print header
     print("\nTime(s) | Joint1(deg) | Joint2(deg) | Vel1(deg/s) | Vel2(deg/s) | Torque1(Nm) | Torque2(Nm)")
     print("-" * 100)
 
     # Run simulation
-    start_time = time.time()
     while not glfw.window_should_close(window) and data.time < args.sim_time:
         # Get control action
         action = controller.get_action()
@@ -139,12 +98,82 @@ def main():
         
         # Small sleep to prevent excessive CPU usage
         time.sleep(0.01)
-
-    # Save logged data
-    logger.save_data()
     
     # Cleanup
     glfw.terminate()
+
+def run_simulation_no_rendering(model, data, controller, logger, args):
+    """Run simulation without visualization for faster data generation."""
+    print("Running simulation without visualization...")
+    print(f"Simulation time: {args.sim_time} seconds")
+    
+    # Run simulation
+    while data.time < args.sim_time:
+        # Get control action
+        action = controller.get_action()
+        
+        # Apply action and step simulation
+        data.ctrl[:] = action
+        mujoco.mj_step(model, data)
+        
+        # Log data
+        logger.log_step(data, model, data.time)
+        
+        # Print progress every second
+        if int(data.time) > int(data.time - model.opt.timestep):
+            print(f"Simulation progress: {data.time:.1f}/{args.sim_time:.1f} seconds")
+
+def main():
+    parser = argparse.ArgumentParser(description="Run a simple MuJoCo simulation with the n_link_robot model")
+    parser.add_argument("--xml_path", type=str, default="4_data/1_xml_models/n_link_robot.xml",
+                      help="Path to the MuJoCo XML file")
+    parser.add_argument("--sim_time", type=float, default=20.0,
+                      help="Simulation time in seconds")
+    parser.add_argument("--control_mode", type=str, default="pd",
+                      choices=["random", "constant", "pd"],
+                      help="Control mode: random, constant, or pd")
+    parser.add_argument("--constant_torque", type=float, default=5.0,
+                      help="Torque value for constant control mode")
+    parser.add_argument("--target_angle", type=float, default=10.0,
+                      help="Target angle in degrees for PD control")
+    parser.add_argument("--kp", type=float, default=100.0,
+                      help="Position gain for PD control")
+    parser.add_argument("--kd", type=float, default=10.0,
+                      help="Velocity gain for PD control")
+    parser.add_argument("--no-render", action="store_true",
+                      help="Run without visualization for faster data generation")
+    args = parser.parse_args()
+
+    # Load model and initialize simulation
+    global model  # Needed for visualization
+    model = load_model(args.xml_path)
+    data = init_simulation(model)
+        
+    # Create controller-specific parameter dictionaries
+    controller_params = {}
+    if args.control_mode == "constant":
+        controller_params = {"constant_torque": args.constant_torque}
+    elif args.control_mode == "pd":
+        controller_params = {
+            "target_angle": np.deg2rad(args.target_angle),
+            "kp": args.kp,
+            "kd": args.kd
+        }
+    
+    # Initialize controller
+    controller = create_controller(args.control_mode, model, data, **controller_params)
+    
+    # Initialize data logger
+    logger = DataLogger()
+    
+    # Run simulation with or without rendering
+    if args.no_render:
+        run_simulation_no_rendering(model, data, controller, logger, args)
+    else:
+        run_simulation_with_rendering(model, data, controller, logger, args)
+
+    # Save logged data
+    logger.save_data()
 
 if __name__ == "__main__":
     main() 
