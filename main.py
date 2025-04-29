@@ -21,14 +21,17 @@ class FakePendulumDataset(InMemoryDataset):
 
     def _sample_graph(self):
         n = random.randint(1, 4)  # 1–4 joints
+        damping = torch.empty(n).uniform_(0.05, 1.0).unsqueeze(1)  # [n,1]
+    
+        # simulate angles
         theta = torch.empty(n).uniform_(-math.pi, math.pi)
-        omega = torch.empty(n).uniform_(-3.0, 3.0)
+
+        # simulate velocities: high damping → low velocities -----------> still super random but at least some correlation
+        omega = torch.randn(n) * (1.0 - damping.squeeze()) * 3.0
+
         features = torch.stack([theta, omega], dim=1)   # [n,2]
 
-        # Ground-truth damping coefficient
-        damping = torch.empty(n).uniform_(0.05, 1.0).unsqueeze(1)  # [n,1]
-
-        # Edge list (connect i ↔ i+1)
+        # Edge list
         if n == 1:
             edge_index = torch.empty((2,0), dtype=torch.long)
         else:
@@ -36,9 +39,10 @@ class FakePendulumDataset(InMemoryDataset):
             recv = send + 1
             edge_index = torch.cat(
                 [torch.stack([send, recv], dim=0),
-                 torch.stack([recv, send], dim=0)], dim=1)  # bidirectional edges
+                torch.stack([recv, send], dim=0)], dim=1)
 
         return Data(x=features, y=damping, edge_index=edge_index)
+
 
     def _generate(self):
         graphs = [self._sample_graph() for _ in range(self.num_graphs)]
