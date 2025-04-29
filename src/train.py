@@ -3,9 +3,11 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from src.config import NUM_EPOCHS, LEARNING_RATE, WEIGHT_DECAY
+
 
 def run_training(model, train_loader, test_loader, device, epochs=200):
-    optimizer = optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-5)
+    optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
     loss_fn = nn.MSELoss()
 
     def run_epoch(loader, train=True):
@@ -24,7 +26,7 @@ def run_training(model, train_loader, test_loader, device, epochs=200):
         return total_loss / total_nodes
 
     print("Starting training...")
-    for epoch in range(1, epochs + 1):
+    for epoch in range(1, NUM_EPOCHS + 1):
         train_loss = run_epoch(train_loader, train=True)
         if epoch % 20 == 0 or epoch == 1:
             test_loss = run_epoch(test_loader, train=False)

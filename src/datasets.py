@@ -1,6 +1,8 @@
 import math, random
 import torch
 from torch_geometric.data import Data, InMemoryDataset
+from src.config import MAX_JOINTS
+
 
 class FakePendulumDataset(InMemoryDataset):
     """
@@ -13,7 +15,7 @@ class FakePendulumDataset(InMemoryDataset):
         self.data, self.slices = self._generate()
 
     def _sample_graph(self):
-        n = random.randint(1, 4)  # 1–4 joints
+        n = random.randint(1, MAX_JOINTS)  # 1–4 joints
         damping = torch.empty(n).uniform_(0.05, 1.0).unsqueeze(1)  # [n,1]
     
         # simulate angles
