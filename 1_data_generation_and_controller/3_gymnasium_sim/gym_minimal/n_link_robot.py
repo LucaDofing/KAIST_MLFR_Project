@@ -6,6 +6,7 @@ import time
 import json
 from gymnasium.envs.mujoco import MujocoEnv
 from gymnasium.spaces import Box
+import mujoco
 
 
 
@@ -28,6 +29,10 @@ class Customn_link_robotEnv(MujocoEnv):
         current_dir = os.path.dirname(os.path.abspath(__file__))
         # Use the XML from the data directory
         model_path = os.path.join(current_dir, "../../4_data/1_xml_models/n_link_robot.xml")
+
+        # Load the model
+        self.model = mujoco.MjModel.from_xml_path(model_path)
+        self.data = mujoco.MjData(self.model)
 
         super().__init__(
             model_path=model_path,
@@ -55,7 +60,10 @@ class Customn_link_robotEnv(MujocoEnv):
             json.dump(data_to_save, f, indent=4)
 
     def step(self, action):
-        self.do_simulation(action, self.frame_skip)
+        # Apply the action
+        self.data.ctrl[:] = action
+        mujoco.mj_step(self.model, self.data, nstep=self.frame_skip)
+        
         observation = self._get_obs()
         reward = 0.0
         terminated = False
