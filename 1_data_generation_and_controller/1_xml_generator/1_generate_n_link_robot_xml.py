@@ -8,14 +8,19 @@ def create_n_link_robot_xml(
     n_links=1,
     link_length=0.15,          # Length of each link
     link_radius=0.01,          # Radius of the links
-    joint_range=(-2.0, 2.0),   # Range of motion for the second joint
-    target_pos=(0.15, 0.15),   # Fixed position for the target
-    motor_gear=150.0,          # Gear ratio for the motors
-    motor_range=(-1.0, 1.0),   # Control range for the motors
-    gravity=(0, -9.81, 0),     # Gravity vector
-    timestep=0.01,             # Simulation timestep
-    integrator="RK4",          # Integration method
+    joint_range=(-200.0, 200.0),   # Range of motion for the second joint
+    target_pos=(0.15, 0.15, 0.0),   # Fixed position for the target
+    motor_gear=1.0,          # Gear ratio for the motors
+    motor_range=(-100.0, 100.0),   # Control range for the motors
+    gravity=(0, 0, -9.81),     # Gravity vector (z-down)
+    timestep=0.001,             # Simulation timestep
+    integrator="implicit",          # Integration method
     link_density=1000.0,       # Density of the links in kg/m³
+    joint_damping=0.1,         # Damping coefficient for joints
+    joint_friction=0.1,        # Friction coefficient for joints
+    joint_armature=0.0,        # Armature inertia for joints
+    joint_stiffness=0.0,       # Joint stiffness
+    joint_springref=0.0,       # Joint spring reference position
     colors={
         "ground": "0.9 0.9 0.9 1",
         "sides": "0.8 0.3 0.5 1",
@@ -36,8 +41,6 @@ def create_n_link_robot_xml(
     # Add asset section for textures and materials
     asset = ET.SubElement(root, "asset")
     ET.SubElement(asset, "texture", type="skybox", builtin="gradient", rgb1="0.6 0.6 0.6", rgb2="0.3 0.3 0.3", width="512", height="512")
-    ET.SubElement(asset, "texture", name="texplane", type="2d", builtin="checker", rgb1="0.0 0.0 0.0", rgb2="1.0 1.0 1.0", width="512", height="512")
-    ET.SubElement(asset, "material", name="groundmat", texture="texplane", texrepeat="5 5")
     
     # Add visual options
     visual = ET.SubElement(root, "visual")
@@ -46,8 +49,14 @@ def create_n_link_robot_xml(
     
     # Add default settings
     default = ET.SubElement(root, "default")
-    ET.SubElement(default, "joint", armature="1", damping="1", limited="true")
-    ET.SubElement(default, "geom", contype="0", friction="1 0.1 0.1", rgba="1 1 1 1") ## Here you define second background colour
+    ET.SubElement(default, "joint", 
+                 armature=str(joint_armature), 
+                 damping=str(joint_damping), 
+                 frictionloss=str(joint_friction),
+                 stiffness=str(joint_stiffness),
+                 springref=str(joint_springref),
+                 limited="true")
+    ET.SubElement(default, "geom", contype="0", friction="1 0.1 0.1", rgba="1 1 1 1")
     
     # Add simulation options
     option = ET.SubElement(root, "option", 
@@ -61,14 +70,8 @@ def create_n_link_robot_xml(
     # Add camera
     ET.SubElement(worldbody, "camera", 
                  name="track", mode="trackcom", 
-                 pos="0 -0.3 0.3", xyaxes="1 0 0 0 1 1",
+                 pos="0.3 -0.3 0.3", xyaxes="1 0 0 0 1 1",
                  target="body0")
-    
-    # Add ground and sides
-    ET.SubElement(worldbody, "geom", 
-                 conaffinity="0", contype="0", name="ground", 
-                 pos="0 0 0", material="groundmat",
-                 size="1 1 10", type="plane")
     
     # Add light
     ET.SubElement(worldbody, "light",
@@ -77,7 +80,7 @@ def create_n_link_robot_xml(
                  dir="-0 0 -1.3",
                  directional="true",
                  exponent="1",
-                 pos="0 0 1.3",
+                 pos="0.3 0.3 1.3",
                  specular=".1 .1 .1")
     
     # Add root
@@ -89,17 +92,22 @@ def create_n_link_robot_xml(
     # Create actuator section
     actuator = ET.SubElement(root, "actuator")
     
-    # Initialize the first body
-    prev_body = ET.SubElement(worldbody, "body", name="body0", pos="0 0 .01")
+    # Initialize the first body at the base
+    prev_body = ET.SubElement(worldbody, "body", name="body0", pos="0 0 0.01")
     
     # Create the chain of links
     for i in range(n_links):
         # Add joint
         joint_attribs = {
-            "axis": "0 0 1",
+            "axis": "0 1 0",  # Changed to y-axis for rotation
             "name": f"joint{i}",
             "pos": "0 0 0",
-            "type": "hinge"
+            "type": "hinge",
+            "damping": str(joint_damping),
+            "frictionloss": str(joint_friction),
+            "armature": str(joint_armature),
+            "stiffness": str(joint_stiffness),
+            "springref": str(joint_springref)
         }
         if i == 0:
             joint_attribs["limited"] = "false"
@@ -110,7 +118,7 @@ def create_n_link_robot_xml(
 
         # Add geom
         ET.SubElement(prev_body, "geom",
-                     fromto=f"0 0 0 {link_length} 0 0",
+                     fromto=f"0 0 0 0 0 {link_length}",
                      name=f"link{i}", rgba=colors["links"],
                      size=str(link_radius), type="capsule",
                      density=str(link_density))
@@ -123,7 +131,7 @@ def create_n_link_robot_xml(
 
         # If this is the last link, add the fingertip here
         if i == n_links - 1:
-            fingertip = ET.SubElement(prev_body, "body", name="fingertip", pos=f"{link_length + 0.01} 0 0")
+            fingertip = ET.SubElement(prev_body, "body", name="fingertip", pos=f"0 0 {link_length}")
             ET.SubElement(fingertip, "geom",
                          contype="0", name="fingertip",
                          pos="0 0 0", rgba=colors["fingertip"],
@@ -131,13 +139,13 @@ def create_n_link_robot_xml(
                          density=str(link_density))
         else:
             # Otherwise, create the next body for the next link
-            next_body = ET.SubElement(prev_body, "body", name=f"body{i+1}", pos=f"{link_length} 0 0")
+            next_body = ET.SubElement(prev_body, "body", name=f"body{i+1}", pos=f"0 0 {link_length}")
             prev_body = next_body
     
-    # Add fixed target (no joints)
+    # Add fixed target at a different position
     ET.SubElement(worldbody, "geom", 
                  conaffinity="0", contype="0", name="target", 
-                 pos=f"{target_pos[0]} {target_pos[1]} .01", 
+                 pos=f"0.15 0.0 0.15", 
                  rgba=colors["target"], 
                  size=".009", type="sphere")
     
@@ -155,6 +163,7 @@ def save_n_link_robot_xml(xml_content, filename="n_link_robot.xml"):
     # Create the directory if it doesn't exist
     os.makedirs(xml_dir, exist_ok=True)
     # Save the file in the correct location
+    
     with open(os.path.join(xml_dir, filename), "w") as f:
         f.write(xml_content)
 
