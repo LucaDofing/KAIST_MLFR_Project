@@ -144,6 +144,7 @@ def run_simulation_no_rendering(model, data, controller, logger, args):
             next_print_time += progress_interval
 
 def main():
+    sim_start_time = time.time()
     parser = argparse.ArgumentParser(description="Run a simple MuJoCo simulation with the n_link_robot model")
     parser.add_argument("--xml_path", type=str, default="4_data/1_xml_models/n_link_robot.xml",
                       help="Path to the MuJoCo XML file")
@@ -164,6 +165,8 @@ def main():
                       help="Run without visualization for faster data generation")
     parser.add_argument("--speedup", type=float, default=1.0,
                       help="Speedup factor for visualization (default: 1.0). A value of 2.0 means simulation plays twice as fast.")
+    parser.add_argument("--log", type=int, default=0,
+                      help="Enable data logging with 1, by default disabled ")
     args = parser.parse_args()
 
     # Load model and initialize simulation
@@ -195,7 +198,12 @@ def main():
         run_simulation_with_rendering(model, data, controller, logger, args)
 
     # Save logged data
-    logger.save_data()
+    if args.log:
+        logger.save_data()
+    sim_end_time = time.time()
+    print(f"Total Time: {sim_end_time-sim_start_time:.6f}")
+
+
 
 if __name__ == "__main__":
     main() 
