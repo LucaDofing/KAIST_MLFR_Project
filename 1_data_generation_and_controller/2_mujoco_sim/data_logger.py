@@ -56,8 +56,9 @@ class DataLogger:
         filepath = os.path.join(self.save_dir, filename)
         
         # Save to file
-        with open(filepath, "w") as f:
-            json.dump(save_data, f, indent=4)
+        if True:
+            with open(filepath, "w") as f:
+                json.dump(save_data, f, indent=4)
             
         print(f"Data saved to {filepath}")
         

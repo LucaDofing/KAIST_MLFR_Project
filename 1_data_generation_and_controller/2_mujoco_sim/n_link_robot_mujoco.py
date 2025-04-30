@@ -71,33 +71,47 @@ def run_simulation_with_rendering(model, data, controller, logger, args):
     print("\nTime(s) | Joint1(deg) | Joint2(deg) | Vel1(deg/s) | Vel2(deg/s) | Torque1(Nm) | Torque2(Nm)")
     print("-" * 100)
 
+    # Calculate timing parameters
+    RENDER_INTERVAL = 1.0 / 60.0  # Fixed 60 Hz refresh rate
+    DEFAULT_TIMESTEP = 0.01  # Standard MuJoCo timestep
+    actual_speedup = args.speedup * (model.opt.timestep / DEFAULT_TIMESTEP)  # Adjust speedup for timestep
+    
+    sim_start_time = time.time()  # Reference point for timing calculations
+    next_render_time = sim_start_time  # Next time we should render a frame
+
+    print(f"Physics timestep: {model.opt.timestep:.6f}s, Adjusted speedup: {actual_speedup:.1f}x")
+
     # Run simulation
     while not glfw.window_should_close(window) and data.time < args.sim_time:
-        # Get control action
-        action = controller.get_action()
+        # Get control action and step physics until next render time
+        current_time = time.time()
         
-        # Apply action and step simulation
-        data.ctrl[:] = action
-        mujoco.mj_step(model, data)
+        # Run physics steps until we reach the next visualization point
+        target_sim_time = (current_time - sim_start_time) * args.speedup  # Use original speedup for visualization
         
-        # Log data
-        logger.log_step(data, model, data.time)
+        while data.time < min(target_sim_time, args.sim_time):
+            action = controller.get_action()
+            data.ctrl[:] = action
+            mujoco.mj_step(model, data)
+            logger.log_step(data, model, data.time)
         
-        # Print state
-        print_state(data.time, data, action)
-        
-        # Update visualization
-        viewport = mujoco.MjrRect(0, 0, 1200, 900)
-        mujoco.mjv_updateScene(model, data, opt, None, cam,
-                              mujoco.mjtCatBit.mjCAT_ALL.value, scene)
-        mujoco.mjr_render(viewport, scene, context)
-        
-        # Swap buffers and poll events
-        glfw.swap_buffers(window)
-        glfw.poll_events()
-        
-        # Small sleep to prevent excessive CPU usage
-        time.sleep(0.01)
+        # Render if it's time
+        if current_time >= next_render_time:
+            # Print state (synchronized with rendering)
+            print_state(data.time, data, action)
+            
+            # Update visualization
+            viewport = mujoco.MjrRect(0, 0, 1200, 900)
+            mujoco.mjv_updateScene(model, data, opt, None, cam,
+                                  mujoco.mjtCatBit.mjCAT_ALL.value, scene)
+            mujoco.mjr_render(viewport, scene, context)
+            
+            # Swap buffers and poll events
+            glfw.swap_buffers(window)
+            glfw.poll_events()
+            
+            # Calculate next render time
+            next_render_time = current_time + RENDER_INTERVAL
     
     # Cleanup
     glfw.terminate()
@@ -106,6 +120,11 @@ def run_simulation_no_rendering(model, data, controller, logger, args):
     """Run simulation without visualization for faster data generation."""
     print("Running simulation without visualization...")
     print(f"Simulation time: {args.sim_time} seconds")
+    print(f"Physics timestep: {model.opt.timestep} seconds")
+    
+    # Calculate progress update interval based on speedup
+    progress_interval = 1.0  # Print every second of simulation time
+    next_print_time = progress_interval
     
     # Run simulation
     while data.time < args.sim_time:
@@ -116,12 +135,13 @@ def run_simulation_no_rendering(model, data, controller, logger, args):
         data.ctrl[:] = action
         mujoco.mj_step(model, data)
         
-        # Log data
+        # Log every physics step
         logger.log_step(data, model, data.time)
         
-        # Print progress every second
-        if int(data.time) > int(data.time - model.opt.timestep):
+        # Print progress at regular intervals of simulation time
+        if data.time >= next_print_time:
             print(f"Simulation progress: {data.time:.1f}/{args.sim_time:.1f} seconds")
+            next_print_time += progress_interval
 
 def main():
     parser = argparse.ArgumentParser(description="Run a simple MuJoCo simulation with the n_link_robot model")
@@ -142,6 +162,8 @@ def main():
                       help="Velocity gain for PD control")
     parser.add_argument("--no-render", action="store_true",
                       help="Run without visualization for faster data generation")
+    parser.add_argument("--speedup", type=float, default=1.0,
+                      help="Speedup factor for visualization (default: 1.0). A value of 2.0 means simulation plays twice as fast.")
     args = parser.parse_args()
 
     # Load model and initialize simulation
