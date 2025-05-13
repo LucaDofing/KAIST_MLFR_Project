@@ -11,9 +11,17 @@ def load_model(xml_path):
     """Load the MuJoCo model from XML file."""
     return mujoco.MjModel.from_xml_path(xml_path)
 
-def init_simulation(model):
-    """Initialize the simulation data."""
-    return mujoco.MjData(model)
+def init_simulation(model, initial_angle=0.0):
+    """Initialize the simulation data.
+    
+    Args:
+        model: MuJoCo model
+        initial_angle (float): Initial angle in radians for all joints
+    """
+    data = mujoco.MjData(model)
+    # Set all joint angles to the same initial value
+    data.qpos[:model.nu] = initial_angle
+    return data
 
 def init_visualization():
     """Initialize GLFW and MuJoCo visualization."""
@@ -34,10 +42,13 @@ def init_visualization():
     scene = mujoco.MjvScene(model, maxgeom=10000)
     context = mujoco.MjrContext(model, mujoco.mjtFontScale.mjFONTSCALE_150.value)
     
-    # Set initial camera position
+    # Set camera viewpoint
     cam.distance = 1.0
-    cam.azimuth = 0.0
-    cam.elevation = -90.0
+    cam.elevation = -20
+    cam.azimuth = 90
+    cam.lookat[0] = 0.0  # x
+    cam.lookat[1] = 0.0  # y
+    cam.lookat[2] = 0.0  # z
     
     return window, cam, opt, scene, context
 
@@ -45,19 +56,7 @@ def rad2deg(rad):
     """Convert radians to degrees."""
     return rad * 180.0 / np.pi
 
-def print_state(time, data, action):
-    """Print current simulation state."""
-    # Convert joint angles to degrees
-    joint_angles_deg = np.rad2deg(data.qpos[:2])
-    joint_vels_deg = np.rad2deg(data.qvel[:2])
-    
-    print(f"Time: {time:6.2f} | "
-          f"Joint1: {joint_angles_deg[0]:10.2f}° | "
-          f"Joint2: {joint_angles_deg[1]:10.2f}° | "
-          f"Vel1: {joint_vels_deg[0]:10.2f}°/s | "
-          f"Vel2: {joint_vels_deg[1]:10.2f}°/s | "
-          f"Torque1: {action[0]:10.2f}Nm | "
-          f"Torque2: {action[1]:10.2f}Nm")
+
 
 def run_simulation_with_rendering(model, data, controller, logger, args):
     """Run simulation with visualization."""
@@ -98,7 +97,6 @@ def run_simulation_with_rendering(model, data, controller, logger, args):
         # Render if it's time
         if current_time >= next_render_time:
             # Print state (synchronized with rendering)
-            print_state(data.time, data, action)
             
             # Update visualization
             viewport = mujoco.MjrRect(0, 0, 1200, 900)
@@ -157,6 +155,8 @@ def main():
                       help="Torque value for constant control mode")
     parser.add_argument("--target_angle", type=float, default=10.0,
                       help="Target angle in degrees for PD control")
+    parser.add_argument("--initial_angle", type=float, default=0.0,
+                      help="Initial angle in degrees for all joints")
     parser.add_argument("--kp", type=float, default=100.0,
                       help="Position gain for PD control")
     parser.add_argument("--kd", type=float, default=10.0,
@@ -172,7 +172,7 @@ def main():
     # Load model and initialize simulation
     global model  # Needed for visualization
     model = load_model(args.xml_path)
-    data = init_simulation(model)
+    data = init_simulation(model, np.deg2rad(args.initial_angle))
         
     # Create controller-specific parameter dictionaries
     controller_params = {}
@@ -190,6 +190,7 @@ def main():
     
     # Initialize data logger
     logger = DataLogger()
+    logger.extract_static_properties(model)  # Extract static properties from the model
     
     # Run simulation with or without rendering
     if args.no_render:
