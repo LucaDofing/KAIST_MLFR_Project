@@ -1,9 +1,9 @@
 # src/config.py
 
 # Dataset parameters
-NUM_GRAPHS = 1200          # total number of graphs
+NUM_GRAPHS = 5000          # total number of graphs
 TRAIN_SPLIT = 1000         # number of graphs for training
-MAX_JOINTS = 4             # maximum number of joints in fake pendulums
+MAX_JOINTS = 1           # maximum number of joints in fake pendulums
 
 # Training parameters
 BATCH_SIZE = 64
