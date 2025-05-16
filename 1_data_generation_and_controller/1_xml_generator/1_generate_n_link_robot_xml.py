@@ -13,11 +13,11 @@ def create_n_link_robot_xml(
     motor_gear=1.0,          # Gear ratio for the motors
     motor_range=(-100.0, 100.0),   # Control range for the motors
     gravity=(0, 0, -9.81),     # Gravity vector (z-down)
-    timestep=0.001,             # Simulation timestep
+    timestep=0.01,             # Simulation timestep
     integrator="implicit",          # Integration method
     link_density=1000.0,       # Density of the links in kg/m³
     joint_damping=0.1,         # Damping coefficient for joints
-    joint_friction=0.1,        # Friction coefficient for joints
+    joint_friction=0.0,        # Friction coefficient for joints
     joint_armature=0.0,        # Armature inertia for joints
     joint_stiffness=0.0,       # Joint stiffness
     joint_springref=0.0,       # Joint spring reference position
