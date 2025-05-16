@@ -36,7 +36,7 @@ class ConstantController(Controller):
 
 class PDController(Controller):
     """PD (Proportional-Derivative) controller."""
-    def __init__(self, model, data, target_angle=np.deg2rad(10.0), kp=100.0, kd=10.0):
+    def __init__(self, model, data, target_angle=np.deg2rad(10.0), kp=5.0, kd=3.0):
         super().__init__(model, data)
         self.target_angle = target_angle
         self.kp = kp  # Position gain
