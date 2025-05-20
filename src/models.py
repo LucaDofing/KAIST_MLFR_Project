@@ -3,18 +3,16 @@ from torch import nn
 from torch_geometric.nn import GCNConv
 
 class DampingGCN(nn.Module):
-    def __init__(self, in_feats=2, hidden=64, out_feats=1, num_layers=3):
+    def __init__(self, hidden_dim=64):
         super().__init__()
-        self.convs = nn.ModuleList()
-        self.convs.append(GCNConv(in_feats, hidden))
-        for _ in range(num_layers-2):
-            self.convs.append(GCNConv(hidden, hidden))
-        self.convs.append(GCNConv(hidden, out_feats))
-        self.act = nn.ReLU()
+        self.conv1 = GCNConv(2, hidden_dim)
+        self.conv2 = GCNConv(hidden_dim, hidden_dim)
+        self.conv3 = GCNConv(hidden_dim, hidden_dim)
+        self.linear = nn.Linear(hidden_dim, 1)  # Output: estimated damping
 
     def forward(self, data):
         x, edge_index = data.x, data.edge_index
-        for conv in self.convs[:-1]:
-            x = self.act(conv(x, edge_index))
-        x = self.convs[-1](x, edge_index)  # no activation after final layer
-        return x
+        x = torch.relu(self.conv1(x, edge_index))
+        x = torch.relu(self.conv2(x, edge_index))
+        x = torch.relu(self.conv3(x, edge_index))
+        return self.linear(x)  # shape: [num_nodes, 1]

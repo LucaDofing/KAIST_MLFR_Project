@@ -1,42 +1,46 @@
 # main.py
 
-import math, random
 import torch
 from torch_geometric.loader import DataLoader
 from src.datasets import FakePendulumDataset
 from src.models import DampingGCN
 from src.train import run_training
-
 from src.config import NUM_GRAPHS, TRAIN_SPLIT, BATCH_SIZE
-from src.datasets import FakePendulumDataset
-from src.models import DampingGCN
-from src.train import run_training
-import torch
-from torch_geometric.loader import DataLoader
+from src.train import simulate_step
 
 
-# Load dataset
-full_dataset = FakePendulumDataset(NUM_GRAPHS) #generates n random graphs with Nodes = joints, Node features = [joint angle, joint velocity], Target labels = true (damping) coefficient per joint
-train_dataset, test_dataset = torch.utils.data.random_split(full_dataset, [TRAIN_SPLIT, NUM_GRAPHS - TRAIN_SPLIT], generator=torch.Generator().manual_seed(42)) #Split into training and testing sets, with a fixed seed
-# batches (à 64 graphs) for GNN training.
-train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
+def main():
+    # Step 1: Load dataset (unsupervised mode)
+    full_dataset = FakePendulumDataset(NUM_GRAPHS, mode="unsupervised")
+    train_dataset, test_dataset = torch.utils.data.random_split(
+        full_dataset, [TRAIN_SPLIT, NUM_GRAPHS - TRAIN_SPLIT], generator=torch.Generator().manual_seed(42)
+    )
 
-# set device (GPU not tested yet)
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
+    test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
 
-# Create model
-model = DampingGCN().to(device)
+    # Step 2: Model
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model = DampingGCN().to(device)
 
-# Train model
-run_training(model, train_loader, test_loader, device)
+    # Step 3: Train
+    run_training(model, train_loader, test_loader, device)
 
-# Demo with one random graph, unseen data
-print("\nRunning a demo prediction...")
-model.eval()
-sample = FakePendulumDataset(1)[0].to(device)
-with torch.no_grad():
-    pred_damping = model(sample)
+    # Optional: Run a test prediction
+    sample = full_dataset[0].to(device)
+    with torch.no_grad():
+        pred_damping = model(sample)
+        pred_next = simulate_step(sample.x, pred_damping)
 
-print("True damping coefficients:", sample.y.squeeze().cpu().numpy())
-print("Predicted damping coefficients:", pred_damping.squeeze().cpu().numpy())
+    print("\nSample prediction (unsupervised):")
+    print("Current state θ, ω:")
+    print(sample.x.cpu().numpy())
+    print("Predicted next state:")
+    print(pred_next.cpu().numpy())
+    print("True next state:")
+    print(sample.x_next.cpu().numpy())
+    print("Estimated damping per joint (from GNN):")
+    print(pred_damping.squeeze().cpu().numpy())
+
+if __name__ == "__main__":
+    main()
