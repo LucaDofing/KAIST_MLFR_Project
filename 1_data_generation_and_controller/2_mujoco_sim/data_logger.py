@@ -96,8 +96,10 @@ class DataLogger:
             self.data["static_properties"]["nodes"].append({
                 "mass": float(mass),
                 "length": float(length),
+                "radius": float(geom.size[0]),  # Add radius
                 "damping": float(damping),
-                "friction": float(friction)
+                "friction": float(friction),
+                "inertia": body.inertia.tolist()  # Add inertia matrix
             })
             
             # Add edge to kinematic chain
