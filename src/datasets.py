@@ -152,22 +152,23 @@ class MuJoCoPendulumDataset(InMemoryDataset):
             true_length = torch.tensor([static_props['length']], dtype=torch.float32)
             true_damping_coeff = torch.tensor([static_props['damping']], dtype=torch.float32)
             true_friction = torch.tensor([static_props['friction']], dtype=torch.float32)
+            inertia_yy = torch.tensor([static_props['inertia_yy']], dtype=torch.float32)
             
             # For a single link pendulum, edge_index is empty
             edge_index = torch.empty((2, 0), dtype=torch.long)
 
             thetas = torch.tensor(time_series['theta'], dtype=torch.float32)
             omegas = torch.tensor(time_series['omega'], dtype=torch.float32)
-            # alphas_true = torch.tensor(time_series['alpha'], dtype=torch.float32) # For future use
-            # torques_applied = torch.tensor(time_series['torque'], dtype=torch.float32) # For future use
+            alphas_true = torch.tensor(time_series['alpha'], dtype=torch.float32) # For future use
+            torques_applied = torch.tensor(time_series['torque'], dtype=torch.float32) # For future use
             
             # Each step (t, t+1) is a sample
             for i in range(num_steps - 1):
                 x_t = torch.cat([thetas[i], omegas[i]], dim=0).unsqueeze(0) # Shape [1, 2] for 1 link
                 x_t_plus_1 = torch.cat([thetas[i+1], omegas[i+1]], dim=0).unsqueeze(0) # Shape [1, 2]
                 
-                # torque_t = torques_applied[i].unsqueeze(0) # For future use
-                # alpha_t_true = alphas_true[i].unsqueeze(0) # For future use
+                torque_t = torques_applied[i].unsqueeze(0) # For future use
+                alpha_t_true = alphas_true[i].unsqueeze(0) # For future use
 
                 graph_data = Data(
                     x=x_t,
@@ -176,10 +177,12 @@ class MuJoCoPendulumDataset(InMemoryDataset):
                     y_true_damping=true_damping_coeff, # Storing the physical damping
                     dt_step=dt_step,
                     # Store other potentially useful info
-                    # true_torque_t = torque_t, 
-                    # true_alpha_t = alpha_t_true,
+                    true_torque_t = torque_t, 
+                    true_alpha_t = alpha_t_true,
                     true_mass = true_mass,
                     true_length = true_length,
+                    inertia_yy=inertia_yy,
+
                     file_origin=os.path.basename(json_file_path), # Add this
                     step_index_in_file=i # Add this for more context
                 )

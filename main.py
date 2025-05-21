@@ -3,7 +3,7 @@ import torch
 from torch_geometric.loader import DataLoader
 from src.datasets import MuJoCoPendulumDataset # Changed from FakePendulumDataset
 from src.models import DampingGCN
-from src.train import run_training, simulate_step # simulate_step might not be needed here if used only in train
+from src.train import run_training, simulate_step, simulate_step_physical # simulate_step might not be needed here if used only in train
 from src.config import (
     TOTAL_SAMPLES_FROM_JSON, TRAIN_SPLIT_RATIO, BATCH_SIZE,
     HIDDEN_DIM, NUM_EPOCHS, LEARNING_RATE, WEIGHT_DECAY # Added HIDDEN_DIM
@@ -55,21 +55,28 @@ def main():
 
     # Optional: Run a test prediction on a sample from the dataset
     if len(full_dataset) > 0:
-        sample_idx = 0 # Or any other index
+        sample_idx = 0
         sample = full_dataset[sample_idx].to(device)
-        
+
         with torch.no_grad():
-            model.eval() # Ensure model is in eval mode
+            model.eval()
             pred_damping = model(sample)
-            
-            # Get dt from the sample itself
-            sample_dt = sample.dt_step.item() 
-            
-            # Use the simulate_step from train.py for consistency
-            pred_next = simulate_step(sample.x, pred_damping, dt=sample_dt)
+            estimated_b_coeff = pred_damping.squeeze()  # <--- hier hinzugefügt
+
+            sample_dt = sample.dt_step.item()
+
+            pred_next = simulate_step_physical(
+                x=sample.x,
+                applied_torque=sample.true_torque_t,
+                estimated_b=estimated_b_coeff,
+                dt=sample_dt,
+                mass=sample.true_mass,
+                length_com_for_gravity=sample.true_length,
+                inertia_yy=sample.inertia_yy,
+                gravity_accel=sample.gravity_accel
+            )
 
         print("\nSample prediction (unsupervised):")
-        # print(f"File source: {full_dataset.dataset.data_list[sample_idx].file_origin if hasattr(full_dataset.dataset, 'data_list') and hasattr(full_dataset.dataset.data_list[sample_idx], 'file_origin') else 'N/A'}") # If you add file_origin to Data
         print("Current state θ, ω:")
         print(sample.x.cpu().numpy())
         print("Predicted next state θ_next, ω_next:")
@@ -81,8 +88,12 @@ def main():
         if hasattr(sample, 'y_true_damping'):
             print("True physical damping per joint (from JSON):")
             print(sample.y_true_damping.cpu().numpy())
-    else:
-        print("Dataset is empty, cannot run sample prediction.")
+        print("Estimated physical damping coeff 'b' (from GNN):")
+        print(estimated_b_coeff.cpu().numpy())
+        if hasattr(sample, 'y_true_damping_b'):
+            print("True physical damping coeff 'b' (from JSON):")
+            print(sample.y_true_damping_b.cpu().numpy())
+        print(f"  (using mass: {sample.mass.item():.4f}, L_com_gravity: {sample.length_com_for_gravity.item():.4f}, I_yy: {sample.inertia_yy.item():.6e}, dt: {sample.dt_step.item()}, g: {sample.gravity_accel.item()})")
 
 if __name__ == "__main__":
     main()

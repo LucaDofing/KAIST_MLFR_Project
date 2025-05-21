@@ -70,3 +70,50 @@ def run_training(model, train_loader, test_loader, device, epochs=200, lr=1e-3, 
             test_loss = run_epoch(test_loader, train=False)
             print(f"Epoch {epoch:3d} | Train MSE: {train_loss:.4f} | Test MSE: {test_loss:.4f}")
     print("Training done.")
+
+
+def simulate_step_physical(x, applied_torque, estimated_b, dt, mass, length_com_for_gravity, inertia_yy, gravity_accel):
+    theta, omega = x[:, 0], x[:, 1]
+    b_estimated = estimated_b.squeeze(-1)
+    mass_sq = mass.squeeze(-1)
+    length_com_sq = length_com_for_gravity.squeeze(-1)
+    inertia_yy_sq = inertia_yy.squeeze(-1)
+    applied_torque_sq = applied_torque.squeeze(-1)
+    g = gravity_accel.squeeze(-1) # Should be scalar or same dim as others
+
+    # Torque due to gravity
+    # Assuming theta is angle from horizontal X-axis, for a Y-axis hinge, gravity in -Z
+    # Torque_gravity_about_Y = CoM_x_world * Force_z_world
+    # CoM_x_world = length_com_sq * cos(theta)
+    # Force_z_world = -mass_sq * g
+    # torque_gravity = length_com_sq * torch.cos(theta) * (-mass_sq * g) # This seems to be the standard
+    # Let's re-verify standard pendulum equation: I * alpha = -m*g*L*sin(theta_from_vertical) - b*omega
+    # If your theta is angle from horizontal X-axis:
+    # sin(theta_from_vertical) = cos(theta_from_horizontal)
+    # So, torque_gravity = -mass_sq * g * length_com_sq * torch.cos(theta) # if theta is from horizontal
+    # OR, if theta is from vertical:
+    torque_gravity = -mass_sq * g * length_com_sq * torch.sin(theta) # if theta is from vertical
+
+    torque_damping = -b_estimated * omega
+    
+    net_torque = applied_torque_sq + torque_gravity + torque_damping
+    
+    alpha = net_torque / inertia_yy_sq
+
+    omega_next = omega + alpha * dt
+    theta_next = theta + omega_next * dt 
+
+    return torch.stack([theta_next, omega_next], dim=1)
+
+# ... run_training function (update the call to simulate_step_physical) ...
+# Inside run_epoch:
+# pred_next = simulate_step_physical(
+#     x=data.x,
+#     applied_torque=data.applied_torque_t,
+#     estimated_b=estimated_b_coeff, # GNN now predicts 'b'
+#     dt=current_dt,
+#     mass=data.mass,
+#     length_com_for_gravity=data.length_com_for_gravity,
+#     inertia_yy=data.inertia_yy,
+#     gravity_accel=data.gravity_accel # Pass gravity
+# )
