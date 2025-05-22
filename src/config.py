@@ -18,3 +18,5 @@ INPUT_DIM = 2              # (theta, omega)
 HIDDEN_DIM = 64
 OUTPUT_DIM = 1             # Predict damping per node
 NUM_LAYERS = 3             # GCN layers
+
+MODEL_CHECKPOINT_DIR = "experiments/"

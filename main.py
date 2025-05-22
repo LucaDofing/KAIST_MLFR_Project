@@ -6,7 +6,7 @@ from src.models import DampingGCN
 from src.train import run_training, simulate_step # simulate_step might not be needed here if used only in train
 from src.config import (
     TOTAL_SAMPLES_FROM_JSON, TRAIN_SPLIT_RATIO, BATCH_SIZE,
-    HIDDEN_DIM, NUM_EPOCHS, LEARNING_RATE, WEIGHT_DECAY # Added HIDDEN_DIM
+    HIDDEN_DIM, NUM_EPOCHS, LEARNING_RATE, WEIGHT_DECAY, MODEL_CHECKPOINT_DIR # Added HIDDEN_DIM
 )
 import os # For path joining
 
@@ -52,6 +52,18 @@ def main():
     # Step 3: Train
     run_training(model, train_loader, test_loader, device, 
                  epochs=NUM_EPOCHS, lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
+    
+    # ... (after run_training call)
+    print("Training done.")
+
+    # --- Save the trained model ---
+    model_save_path = os.path.join(MODEL_CHECKPOINT_DIR, "gnn_effective_damping_model.pth")
+    os.makedirs(MODEL_CHECKPOINT_DIR, exist_ok=True)
+    torch.save(model.state_dict(), model_save_path)
+    print(f"Trained model saved to {model_save_path}")
+    # -----------------------------
+
+    # ... (rest of your sample prediction code)
 
     # Optional: Run a test prediction on a sample from the dataset
     if len(full_dataset) > 0:
