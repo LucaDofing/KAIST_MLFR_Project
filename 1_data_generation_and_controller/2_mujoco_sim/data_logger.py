@@ -18,7 +18,8 @@ class DataLogger:
                 "num_steps": 0,
                 "dt": 0.0,
                 "gravity": [0.0, 0.0, 0.0],
-                "solver": "Unknown"
+                "solver": "Unknown",
+                "simulation_time": None  # Will be set when saving data
             },
             "static_properties": {
                 "nodes": [],
@@ -157,7 +158,8 @@ class DataLogger:
                 "num_steps": 0,
                 "dt": 0.0,
                 "gravity": [0.0, 0.0, 0.0],
-                "solver": "Unknown"
+                "solver": "Unknown",
+                "simulation_time": None  # Will be set when saving data
             },
             "static_properties": {
                 "nodes": [],

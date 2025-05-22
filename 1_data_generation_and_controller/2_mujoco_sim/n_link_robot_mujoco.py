@@ -43,8 +43,8 @@ def init_visualization():
     context = mujoco.MjrContext(model, mujoco.mjtFontScale.mjFONTSCALE_150.value)
     
     # Set camera viewpoint
-    cam.distance = 1.0
-    cam.elevation = -20
+    cam.distance = 1.5
+    cam.elevation = 0
     cam.azimuth = 90
     cam.lookat[0] = 0.0  # x
     cam.lookat[1] = 0.0  # y
@@ -66,10 +66,7 @@ def run_simulation_with_rendering(model, data, controller, logger, args):
         print("Failed to initialize visualization")
         return
     
-    # Print header
-    print("\nTime(s) | Joint1(deg) | Joint2(deg) | Vel1(deg/s) | Vel2(deg/s) | Torque1(Nm) | Torque2(Nm)")
-    print("-" * 100)
-
+ 
     # Calculate timing parameters
     RENDER_INTERVAL = 1.0 / 60.0  # Fixed 60 Hz refresh rate
     DEFAULT_TIMESTEP = 0.01  # Standard MuJoCo timestep
@@ -151,15 +148,15 @@ def main():
     parser.add_argument("--control_mode", type=str, default="pd",
                       choices=["random", "constant", "pd"],
                       help="Control mode: random, constant, or pd")
-    parser.add_argument("--constant_torque", type=float, default=5.0,
+    parser.add_argument("--constant_torque", type=float, default=0.5,
                       help="Torque value for constant control mode")
-    parser.add_argument("--target_angle", type=float, default=10.0,
+    parser.add_argument("--target_angle", type=float, default=5.0,
                       help="Target angle in degrees for PD control")
     parser.add_argument("--initial_angle", type=float, default=0.0,
                       help="Initial angle in degrees for all joints")
-    parser.add_argument("--kp", type=float, default=100.0,
+    parser.add_argument("--kp", type=float, default=3.0,
                       help="Position gain for PD control")
-    parser.add_argument("--kd", type=float, default=10.0,
+    parser.add_argument("--kd", type=float, default=0.01,
                       help="Velocity gain for PD control")
     parser.add_argument("--no-render", action="store_true",
                       help="Run without visualization for faster data generation")
@@ -197,11 +194,16 @@ def main():
         run_simulation_no_rendering(model, data, controller, logger, args)
     else:
         run_simulation_with_rendering(model, data, controller, logger, args)
-
+    sim_end_time = time.time()
     # Save logged data
     if args.log:
+        # Set simulation time in metadata
+        if args.no_render:
+            logger.data["metadata"]["simulation_time"] = sim_end_time - sim_start_time
+        else:
+            logger.data["metadata"]["simulation_time"] = "Inf (rendering enabled)"
         logger.save_data()
-    sim_end_time = time.time()
+    
     print(f"Total Time: {sim_end_time-sim_start_time:.6f}")
 
 
