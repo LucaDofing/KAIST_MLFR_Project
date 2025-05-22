@@ -12,7 +12,7 @@ class Controller:
 
 class RandomController(Controller):
     """Controller that generates random actions."""
-    def __init__(self, model, data, action_range=(-1.0, 1.0)):
+    def __init__(self, model, data, action_range):
         super().__init__(model, data)
         self.action_range = action_range
         
@@ -26,7 +26,7 @@ class RandomController(Controller):
 
 class ConstantController(Controller):
     """Controller that applies constant torques."""
-    def __init__(self, model, data, constant_torque=5.0):
+    def __init__(self, model, data, constant_torque):
         super().__init__(model, data)
         self.constant_torque = constant_torque
         
@@ -34,9 +34,9 @@ class ConstantController(Controller):
         """Return constant torque for all joints."""
         return np.full(self.model.nu, self.constant_torque)
 
-class PDController(Controller):
+class PDController(Controller): # Currently this only supports regulation
     """PD (Proportional-Derivative) controller."""
-    def __init__(self, model, data, target_angle=np.deg2rad(10.0), kp=5.0, kd=3.0):
+    def __init__(self, model, data, target_angle, kp, kd):
         super().__init__(model, data)
         self.target_angle = target_angle
         self.kp = kp  # Position gain
