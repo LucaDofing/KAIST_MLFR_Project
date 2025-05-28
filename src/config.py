@@ -20,3 +20,4 @@ OUTPUT_DIM = 1             # Predict damping per node
 NUM_LAYERS = 3             # GCN layers
 
 MODEL_CHECKPOINT_DIR = "experiments/"
+PLOT_DIR = "experiments/"

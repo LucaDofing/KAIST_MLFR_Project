@@ -62,7 +62,16 @@ def main():
     torch.save(model.state_dict(), model_save_path)
     print(f"Trained model saved to {model_save_path}")
     # -----------------------------
+    # ... after
+# train_losses, test_losses = run_training(...)
 
+# Save losses
+loss_history_path = os.path.join(MODEL_CHECKPOINT_DIR, f"loss_history_{json_pattern.replace('*','all')}.npz")
+np.savez(loss_history_path, train_losses=np.array(train_losses), test_losses=np.array(test_losses))
+print(f"Loss history saved to {loss_history_path}")
+
+# ... then call plotting.plot_losses directly here as before for immediate viewing
+plot_losses(train_losses, test_losses, save_path=os.path.join(PLOT_DIR, f"loss_curve_simplified_{json_pattern.replace('*','all')}.png"))
     # ... (rest of your sample prediction code)
 
     # Optional: Run a test prediction on a sample from the dataset

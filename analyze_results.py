@@ -7,7 +7,7 @@ import os
 
 from src.datasets import MuJoCoPendulumDataset # Or the dataset class you used
 from src.models import DampingGCN
-from src.train import simulate_step_simplified # The simplified simulate_step from your training
+from src.train import simulate_step # The simplified simulate_step from your training
 from src.config import (
     BATCH_SIZE, HIDDEN_DIM, PLOT_DIR, MODEL_CHECKPOINT_DIR, TRAIN_SPLIT_RATIO
 )
@@ -103,7 +103,7 @@ def main_analysis():
     # --- Calculate Metrics ---
     # Use the SAME simulate_step function that was used in training
     # This is the simplified one for your "effective damping" model
-    current_simulate_step_fn = simulate_step_simplified 
+    current_simulate_step_fn = simulate_step
 
     avg_mse, avg_mae_theta, avg_mae_omega, predicted_params = calculate_metrics(model, test_loader, device, current_simulate_step_fn)
     print(f"\n--- Metrics on Test Set ---")
