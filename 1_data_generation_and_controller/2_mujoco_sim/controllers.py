@@ -1,40 +1,37 @@
 import numpy as np
+import mujoco
 
 class Controller:
     """Base controller class."""
     def __init__(self, model, data):
         self.model = model
         self.data = data
-        
+    
     def get_action(self):
         """Get control action. To be implemented by subclasses."""
         raise NotImplementedError
 
 class RandomController(Controller):
-    """Controller that generates random actions."""
-    def __init__(self, model, data, action_range):
+    """Random controller that applies random torques."""
+    def __init__(self, model, data):
         super().__init__(model, data)
-        self.action_range = action_range
-        
+        self.torque_range = (-5.0, 5.0)  # Range of random torques
+    
     def get_action(self):
-        """Generate random torques within the specified range."""
-        return np.random.uniform(
-            low=self.action_range[0],
-            high=self.action_range[1],
-            size=self.model.nu
-        )
+        """Generate random control action."""
+        return np.random.uniform(self.torque_range[0], self.torque_range[1], size=self.model.nu)
 
 class ConstantController(Controller):
-    """Controller that applies constant torques."""
-    def __init__(self, model, data, constant_torque):
+    """Constant controller that applies fixed torques."""
+    def __init__(self, model, data, constant_torque=0.5):
         super().__init__(model, data)
         self.constant_torque = constant_torque
-        
+    
     def get_action(self):
-        """Return constant torque for all joints."""
+        """Return constant control action."""
         return np.full(self.model.nu, self.constant_torque)
 
-class PDController(Controller): # Currently this only supports regulation
+class PDController(Controller):
     """PD (Proportional-Derivative) controller."""
     def __init__(self, model, data, target_angle, kp, kd):
         super().__init__(model, data)
@@ -58,24 +55,15 @@ class PDController(Controller): # Currently this only supports regulation
         return torques
 
 def create_controller(controller_type, model, data, **kwargs):
-    """Factory function to create controllers.
-    
-    Args:
-        controller_type (str): Type of controller ("random", "constant", or "pd")
-        model: MuJoCo model
-        data: MuJoCo data
-        **kwargs: Additional arguments for specific controllers
-        
-    Returns:
-        Controller: Instance of the specified controller
-    """
-    controllers = {
-        "random": RandomController,
-        "constant": ConstantController,
-        "pd": PDController
-    }
-    
-    if controller_type not in controllers:
-        raise ValueError(f"Unknown controller type: {controller_type}")
-        
-    return controllers[controller_type](model, data, **kwargs) 
+    """Factory function to create controllers."""
+    if controller_type == "random":
+        return RandomController(model, data)
+    elif controller_type == "constant":
+        return ConstantController(model, data, kwargs.get("constant_torque", 0.5))
+    elif controller_type == "pd":
+        return PDController(model, data,
+                          kwargs.get("target_angle", 0.0),
+                          kwargs.get("kp", 3.0),
+                          kwargs.get("kd", 0.01))
+    else:
+        raise ValueError(f"Unknown controller type: {controller_type}") 
