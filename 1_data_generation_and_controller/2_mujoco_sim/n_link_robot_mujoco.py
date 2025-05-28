@@ -56,8 +56,6 @@ def rad2deg(rad):
     """Convert radians to degrees."""
     return rad * 180.0 / np.pi
 
-
-
 def run_simulation_with_rendering(model, data, controller, logger, args):
     """Run simulation with visualization."""
     # Initialize visualization
@@ -66,7 +64,6 @@ def run_simulation_with_rendering(model, data, controller, logger, args):
         print("Failed to initialize visualization")
         return
     
- 
     # Calculate timing parameters
     RENDER_INTERVAL = 1.0 / 60.0  # Fixed 60 Hz refresh rate
     DEFAULT_TIMESTEP = 0.01  # Standard MuJoCo timestep
@@ -93,8 +90,6 @@ def run_simulation_with_rendering(model, data, controller, logger, args):
         
         # Render if it's time
         if current_time >= next_render_time:
-            # Print state (synchronized with rendering)
-            
             # Update visualization
             viewport = mujoco.MjrRect(0, 0, 1200, 900)
             mujoco.mjv_updateScene(model, data, opt, None, cam,
@@ -150,7 +145,7 @@ def main():
                       help="Control mode: random, constant, or pd")
     parser.add_argument("--constant_torque", type=float, default=0.5,
                       help="Torque value for constant control mode")
-    parser.add_argument("--target_angle", type=float, default=5.0,
+    parser.add_argument("--target_angle", type=float, default=20.0,
                       help="Target angle in degrees for PD control")
     parser.add_argument("--initial_angle", type=float, default=0.0,
                       help="Initial angle in degrees for all joints")
@@ -205,8 +200,6 @@ def main():
         logger.save_data()
     
     print(f"Total Time: {sim_end_time-sim_start_time:.6f}")
-
-
 
 if __name__ == "__main__":
     main() 

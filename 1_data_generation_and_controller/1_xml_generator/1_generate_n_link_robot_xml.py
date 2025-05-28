@@ -27,10 +27,11 @@ def create_n_link_robot_xml(
         "root": "0.8 0.3 0.5 1",
         "links": "0.0 0.3 0.5 1",
         "fingertip": "0.0 0.7 0.5 1",
-        "target": "0.8 0.1 0.1 1"
+        "target": "0.8 0.1 0.1 1",
+        "x_axis": "1.0 0.0 0.0 1",  # Red for X axis
+        "y_axis": "0.0 1.0 0.0 1",  # Green for Y axis
+        "z_axis": "0.0 0.0 1.0 1"   # Blue for Z axis
     }
-
-    ## Default n_link_robot parameters
 ):
     # Create the root element
     root = ET.Element("mujoco", model="n_link_robot")
@@ -40,7 +41,8 @@ def create_n_link_robot_xml(
     
     # Add asset section for textures and materials
     asset = ET.SubElement(root, "asset")
-    ET.SubElement(asset, "texture", type="skybox", builtin="gradient", rgb1="0.6 0.6 0.6", rgb2="0.3 0.3 0.3", width="512", height="512")
+    # Change background to light grey
+    ET.SubElement(asset, "texture", type="skybox", builtin="gradient", rgb1="0.7 0.7 0.7", rgb2="0.7 0.7 0.7", width="512", height="512")
     
     # Add visual options
     visual = ET.SubElement(root, "visual")
@@ -66,6 +68,31 @@ def create_n_link_robot_xml(
     
     # Add worldbody
     worldbody = ET.SubElement(root, "worldbody")
+    
+    # Add coordinate system visualization
+    axis_length = 0.2  # Length of coordinate axes
+    axis_radius = 0.002  # Radius of coordinate axes
+    
+    # X-axis (red)
+    ET.SubElement(worldbody, "geom",
+                 type="cylinder",
+                 fromto=f"0 0 0 {axis_length} 0 0",
+                 size=str(axis_radius),
+                 rgba=colors["x_axis"])
+    
+    # Y-axis (green)
+    ET.SubElement(worldbody, "geom",
+                 type="cylinder",
+                 fromto=f"0 0 0 0 {axis_length} 0",
+                 size=str(axis_radius),
+                 rgba=colors["y_axis"])
+    
+    # Z-axis (blue)
+    ET.SubElement(worldbody, "geom",
+                 type="cylinder",
+                 fromto=f"0 0 0 0 0 {axis_length}",
+                 size=str(axis_radius),
+                 rgba=colors["z_axis"])
     
     # Add camera
     ET.SubElement(worldbody, "camera", 
@@ -154,25 +181,27 @@ def create_n_link_robot_xml(
     
     return xmlstr
 
-def save_n_link_robot_xml(xml_content, filename="n_link_robot.xml"):
-    # Get the absolute path to the project root
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    project_root = os.path.dirname(os.path.dirname(current_dir))
-    xml_dir = os.path.join(project_root, "1_data_generation_and_controller", "4_data", "1_xml_models")
+def main():
+    parser = argparse.ArgumentParser(description="Generate an n-link robot XML model for MuJoCo")
+    parser.add_argument("--num_links", type=int, default=2,
+                      help="Number of links in the robot (default: 2)")
+    parser.add_argument("--output_dir", type=str, default="4_data/1_xml_models",
+                      help="Directory to save the generated XML file")
+    args = parser.parse_args()
     
-    # Create the directory if it doesn't exist
-    os.makedirs(xml_dir, exist_ok=True)
-    # Save the file in the correct location
+    # Create output directory if it doesn't exist
+    os.makedirs(args.output_dir, exist_ok=True)
     
-    with open(os.path.join(xml_dir, filename), "w") as f:
-        f.write(xml_content)
+    # Generate XML
+    xml_str = create_n_link_robot_xml(n_links=args.num_links)
+    
+    # Save to file
+    output_file = os.path.join(args.output_dir, "n_link_robot.xml")
+    with open(output_file, "w") as f:
+        f.write(xml_str)
+    
+    print(f"Generated XML model with {args.num_links} links")
+    print(f"Saved to: {output_file}")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Generate n_link_robot.xml with a specified number of links")
-    parser.add_argument("--num_links", type=int, default=1, help="Number of links in the n_link_robot robot (default: 1)")
-    args = parser.parse_args()
-
-    xml_content = create_n_link_robot_xml(n_links=args.num_links)
-    save_n_link_robot_xml(xml_content)
-    print(f"Generated n_link_robot.xml with {args.num_links} links")
-    
+    main() 
