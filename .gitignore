@@ -2,3 +2,6 @@
 1_data_generation_and_controller/4_data/2_mujoco
 KAIST_MLFR_Project/1_data_generation_and_controller/4_data/3_gymnasium
 *.pyc
+
+# add .venv to .gitignore
+.venv/
