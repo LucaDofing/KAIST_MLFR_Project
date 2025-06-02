@@ -153,6 +153,8 @@ class MuJoCoPendulumDataset(InMemoryDataset):
             true_damping_coeff = torch.tensor([static_props['damping']], dtype=torch.float32)
             true_friction = torch.tensor([static_props['friction']], dtype=torch.float32)
             inertia_yy = torch.tensor([static_props['inertia'][1]], dtype=torch.float32)
+            gravity_accel = torch.tensor([metadata['gravity'][2]], dtype=torch.float32)
+
             
             # For a single link pendulum, edge_index is empty
             edge_index = torch.empty((2, 0), dtype=torch.long)
@@ -179,9 +181,13 @@ class MuJoCoPendulumDataset(InMemoryDataset):
                     # Store other potentially useful info
                     true_torque_t = torque_t, 
                     true_alpha_t = alpha_t_true,
-                    true_mass = true_mass,
+                    # true_mass = true_mass,
                     true_length = true_length,
                     inertia_yy=inertia_yy,
+                    gravity_accel=gravity_accel,
+                    true_mass=true_mass,
+                    length_com_for_gravity=true_length,
+                    mass=true_mass,
 
                     file_origin=os.path.basename(json_file_path), # Add this
                     step_index_in_file=i # Add this for more context
