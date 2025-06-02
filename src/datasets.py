@@ -152,7 +152,7 @@ class MuJoCoPendulumDataset(InMemoryDataset):
             true_length = torch.tensor([static_props['length']], dtype=torch.float32)
             true_damping_coeff = torch.tensor([static_props['damping']], dtype=torch.float32)
             true_friction = torch.tensor([static_props['friction']], dtype=torch.float32)
-            inertia_yy = torch.tensor([static_props['inertia_yy']], dtype=torch.float32)
+            inertia_yy = torch.tensor([static_props['inertia'][1]], dtype=torch.float32)
             
             # For a single link pendulum, edge_index is empty
             edge_index = torch.empty((2, 0), dtype=torch.long)
