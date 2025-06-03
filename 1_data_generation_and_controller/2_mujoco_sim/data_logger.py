@@ -166,9 +166,19 @@ class DataLogger:
         self.data["metadata"]["num_steps"] += 1
     
     def save_data(self):
-        """Save logged data to a JSON file."""
-        # Generate filename with timestamp
-        filename = f"simulation_data_{int(time.time())}.json"
+        """Save logged data to a JSON file with a descriptive name based on parameters."""
+        # Get parameters for filename
+        num_links = self.data["metadata"]["num_links"]
+        initial_angle = self.data["static_properties"]["initial_angle_deg"]
+        target_angle = self.data["static_properties"]["target_angle_deg"]
+        kp = self.data["static_properties"]["controller_gains"]["kp"]
+        kd = self.data["static_properties"]["controller_gains"]["kd"]
+        
+        # Get damping from first link (assuming all links have same damping)
+        damping = self.data["static_properties"]["nodes"][0]["damping"] if self.data["static_properties"]["nodes"] else 0.0
+        
+        # Create descriptive filename
+        filename = f"n_link_{num_links}_init_{initial_angle:.1f}_target_{target_angle:.1f}_kp_{kp:.1f}_kd_{kd:.3f}_damping_{damping:.3f}.json"
         filepath = os.path.join(self.save_dir, filename)
         
         # Save to file
