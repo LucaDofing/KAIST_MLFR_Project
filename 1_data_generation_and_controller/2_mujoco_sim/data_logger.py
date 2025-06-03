@@ -23,7 +23,14 @@ class DataLogger:
             },
             "static_properties": {
                 "nodes": [],
-                "edge_index": []
+                "edge_index": [],
+                "controller_gains": {
+                    "kp": None,
+                    "kd": None,
+                    "ki": None
+                },
+                "initial_angle_deg": None,
+                "target_angle_deg": None
             },
             "time_series": {
                 "theta": [],
@@ -38,8 +45,13 @@ class DataLogger:
         # Create save directory if it doesn't exist
         os.makedirs(save_dir, exist_ok=True)
         
-    def extract_static_properties(self, model):
-        """Extract static properties from the MuJoCo model."""
+    def extract_static_properties(self, model, sim_params=None):
+        """Extract static properties from the MuJoCo model.
+        
+        Args:
+            model: MuJoCo model
+            sim_params (dict, optional): Dictionary containing simulation parameters
+        """
         # Get number of links (excluding the root and fingertip)
         num_links = model.nbody - 2  # Subtract root and fingertip
         
@@ -56,6 +68,21 @@ class DataLogger:
             mujoco.mjtIntegrator.mjINT_IMPLICITFAST: "ImplicitFast"
         }
         self.data["metadata"]["solver"] = solver_map.get(model.opt.integrator, "Unknown")
+        
+        # Extract controller gains and angles from sim_params
+        if sim_params is not None:
+            # Store controller gains
+            self.data["static_properties"]["controller_gains"] = {
+                "kp": float(sim_params.get('kp', 0.0)),
+                "kd": float(sim_params.get('kd', 0.0)),
+                "ki": float(sim_params.get('ki', 0.0))
+            }
+            
+            # Store initial and target angles in degrees
+            initial_angle_rad = sim_params.get('initial_angle', 0.0)
+            target_angle_rad = sim_params.get('target_angle', 0.0)
+            self.data["static_properties"]["initial_angle_deg"] = float(np.rad2deg(initial_angle_rad))
+            self.data["static_properties"]["target_angle_deg"] = float(np.rad2deg(target_angle_rad))
         
         # Extract properties for each link
         for i in range(num_links):
@@ -163,7 +190,14 @@ class DataLogger:
             },
             "static_properties": {
                 "nodes": [],
-                "edge_index": []
+                "edge_index": [],
+                "controller_gains": {
+                    "kp": None,
+                    "kd": None,
+                    "ki": None
+                },
+                "initial_angle_deg": None,
+                "target_angle_deg": None
             },
             "time_series": {
                 "theta": [],
@@ -173,4 +207,33 @@ class DataLogger:
             }
         }
         self.prev_omega = None
-        self.start_time = time.time() 
+        self.start_time = time.time()
+
+    def set_sweep_params_static(self, sweep_params: dict):
+        """Store sweep parameters in static_properties.
+        
+        Args:
+            sweep_params (dict): Dictionary containing all sweep parameters including:
+                - initial_conditions: dict with theta and omega
+                - target_angles: list of target angles
+                - controller_params: dict with type, kp, kd, ki
+                - simulation_params: dict with duration and dt
+        """
+        # Update initial conditions
+        if "initial_conditions" in sweep_params:
+            self.data["static_properties"]["initial_conditions"] = sweep_params["initial_conditions"]
+        
+        # Update target angles
+        if "target_angles" in sweep_params:
+            self.data["static_properties"]["target_angles"] = sweep_params["target_angles"]
+        
+        # Update controller parameters
+        if "controller_params" in sweep_params:
+            self.data["static_properties"]["controller_params"] = sweep_params["controller_params"]
+        
+        # Update simulation parameters
+        if "simulation_params" in sweep_params:
+            self.data["static_properties"]["simulation_params"] = sweep_params["simulation_params"]
+        
+        # Store all sweep parameters
+        self.data["static_properties"]["sweep_params"] = sweep_params 

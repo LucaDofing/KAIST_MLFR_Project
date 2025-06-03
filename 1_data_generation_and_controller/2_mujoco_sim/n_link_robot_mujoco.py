@@ -182,7 +182,19 @@ def main():
     
     # Initialize data logger
     logger = DataLogger()
-    logger.extract_static_properties(model)  # Extract static properties from the model
+    
+    # Store simulation parameters
+    sim_params = {
+        'control_mode': args.control_mode,
+        'initial_angle': np.deg2rad(args.initial_angle),
+        'target_angle': np.deg2rad(args.target_angle),
+        'kp': args.kp,
+        'kd': args.kd,
+        'ki': 0.0  # Default value for ki
+    }
+    
+    # Extract static properties with simulation parameters
+    logger.extract_static_properties(model, sim_params)
     
     # Run simulation with or without rendering
     if args.no_render:
@@ -197,6 +209,11 @@ def main():
             logger.data["metadata"]["simulation_time"] = sim_end_time - sim_start_time
         else:
             logger.data["metadata"]["simulation_time"] = "Inf (rendering enabled)"
+        logger.data["static_properties"]["controller_gains"] = {
+            "kp": float(args.kp),
+            "kd": float(args.kd),
+            "ki": float(0.0)  # Assuming ki is not provided in the arguments
+        }
         logger.save_data()
     
     print(f"Total Time: {sim_end_time-sim_start_time:.6f}")

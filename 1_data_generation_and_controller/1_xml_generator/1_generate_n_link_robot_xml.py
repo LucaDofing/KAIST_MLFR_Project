@@ -15,7 +15,7 @@ def create_n_link_robot_xml(
     gravity=(0, 0, -9.81),     # Gravity vector (z-down)
     timestep=0.01,             # Simulation timestep
     integrator="implicit",          # Integration method
-    link_density=1000.0,       # Density of the links in kg/m³
+    link_density=2000.0,       # Density of the links in kg/m³
     joint_damping=0.1,         # Damping coefficient for joints
     joint_friction=0.0,        # Friction coefficient for joints
     joint_armature=0.0,        # Armature inertia for joints
@@ -187,13 +187,25 @@ def main():
                       help="Number of links in the robot (default: 2)")
     parser.add_argument("--output_dir", type=str, default="4_data/1_xml_models",
                       help="Directory to save the generated XML file")
+    parser.add_argument("--link_length", type=float, default=0.15, help="Length of each link")
+    parser.add_argument("--link_radius", type=float, default=0.01, help="Radius of each link")
+    parser.add_argument("--link_density", type=float, default=2000.0, help="Density of each link")
+    parser.add_argument("--joint_damping", type=float, default=0.1, help="Damping coefficient for joints")
+    parser.add_argument("--joint_friction", type=float, default=0.0, help="Friction coefficient for joints")
     args = parser.parse_args()
     
     # Create output directory if it doesn't exist
     os.makedirs(args.output_dir, exist_ok=True)
     
     # Generate XML
-    xml_str = create_n_link_robot_xml(n_links=args.num_links)
+    xml_str = create_n_link_robot_xml(
+        n_links=args.num_links,
+        link_length=args.link_length,
+        link_radius=args.link_radius,
+        link_density=args.link_density,
+        joint_damping=args.joint_damping,
+        joint_friction=args.joint_friction
+    )
     
     # Save to file
     output_file = os.path.join(args.output_dir, "n_link_robot.xml")

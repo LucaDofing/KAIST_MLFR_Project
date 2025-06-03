@@ -5,3 +5,4 @@ KAIST_MLFR_Project/1_data_generation_and_controller/4_data/3_gymnasium
 
 # add .venv to .gitignore
 .venv/
+1_data_generation_and_controller/4_data/1_xml_models
