@@ -45,6 +45,33 @@ class DataLogger:
         # Create save directory if it doesn't exist
         os.makedirs(save_dir, exist_ok=True)
         
+    def _get_next_simulation_number(self):
+        """Get the next simulation number from a counter file."""
+        counter_file = os.path.join(self.save_dir, "simulation_counter.txt")
+        
+        # Create counter file if it doesn't exist
+        if not os.path.exists(counter_file):
+            with open(counter_file, "w") as f:
+                f.write("0")
+        
+        # Read and increment counter
+        with open(counter_file, "r+") as f:
+            # Use file locking to prevent race conditions
+            import fcntl
+            fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+            
+            counter = int(f.read().strip())
+            counter += 1
+            
+            # Write back the new counter
+            f.seek(0)
+            f.write(str(counter))
+            f.truncate()
+            
+            fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+            
+        return counter
+        
     def extract_static_properties(self, model, sim_params=None):
         """Extract static properties from the MuJoCo model.
         
@@ -97,18 +124,9 @@ class DataLogger:
             geom_id = model.body_geomadr[body_id]
             geom = model.geom(geom_id)
             
-            # Calculate mass from density and volume
-            if geom.type == mujoco.mjtGeom.mjGEOM_CAPSULE:
-                # Volume of capsule = πr²h + (4/3)πr³
-                r = geom.size[0]
-                h = geom.size[1] * 2  # Total length
-                volume = np.pi * r**2 * h + (4/3) * np.pi * r**3
-            else:
-                volume = 0.0
-                
-            # Get density from geom (default value if not specified)
-            density = 1000.0  # Default density in kg/m³
-            mass = volume * density
+            # Get mass and inertia directly from model
+            mass = model.body_mass[body_id]
+            inertia = model.body_inertia[body_id].tolist()
             
             # Get link length from geom
             if geom.type == mujoco.mjtGeom.mjGEOM_CAPSULE:
@@ -127,7 +145,7 @@ class DataLogger:
                 "radius": float(geom.size[0]),  # Add radius
                 "damping": float(damping),
                 "friction": float(friction),
-                "inertia": body.inertia.tolist()  # Add inertia matrix
+                "inertia": inertia  # Use model's inertia
             })
             
             # Add edge to kinematic chain
@@ -167,6 +185,9 @@ class DataLogger:
     
     def save_data(self):
         """Save logged data to a JSON file with a descriptive name based on parameters."""
+        # Get next simulation number
+        sim_number = self._get_next_simulation_number()
+        
         # Get parameters for filename
         num_links = self.data["metadata"]["num_links"]
         initial_angle = self.data["static_properties"]["initial_angle_deg"]
@@ -177,8 +198,8 @@ class DataLogger:
         # Get damping from first link (assuming all links have same damping)
         damping = self.data["static_properties"]["nodes"][0]["damping"] if self.data["static_properties"]["nodes"] else 0.0
         
-        # Create descriptive filename
-        filename = f"n_link_{num_links}_init_{initial_angle:.1f}_target_{target_angle:.1f}_kp_{kp:.1f}_kd_{kd:.3f}_damping_{damping:.3f}.json"
+        # Create descriptive filename with simulation ID
+        filename = f"sim_{sim_number:03d}_n_link_{num_links}_init_{initial_angle:.1f}_target_{target_angle:.1f}_kp_{kp:.1f}_kd_{kd:.3f}_damping_{damping:.3f}.json"
         filepath = os.path.join(self.save_dir, filename)
         
         # Save to file
