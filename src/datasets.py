@@ -16,6 +16,8 @@ class FakePendulumDataset(InMemoryDataset):
     def __init__(self, num_graphs=1000, mode="supervised", transform=None):
         self.num_graphs = num_graphs
         self.mode = mode
+        self.min_damping = 0.0
+        self.max_damping = 1.0
         super().__init__('.', transform=transform)
         self.data, self.slices = self._generate()
 
@@ -88,6 +90,8 @@ class MuJoCoPendulumDataset(InMemoryDataset):
         self.json_files_pattern = json_files_pattern
         self.mode = mode # "unsupervised" is the primary mode for your current setup
         # root_dir will be 'data/mujoco/'
+        self.min_damping = 0.0
+        self.max_damping = 1.0
         super().__init__(root_dir, transform, pre_transform)
         self.data, self.slices = torch.load(self.processed_paths[0])
 

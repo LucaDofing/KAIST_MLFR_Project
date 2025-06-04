@@ -9,7 +9,7 @@ MAX_JOINTS = 1 # Still 1 for these JSONs
 
 # Training parameters
 BATCH_SIZE = 64 # Or smaller if memory is an issue with many small graphs
-NUM_EPOCHS = 200 # Or more if needed
+NUM_EPOCHS = 100 # Or more if needed
 LEARNING_RATE = 1e-3
 WEIGHT_DECAY = 1e-5
 
