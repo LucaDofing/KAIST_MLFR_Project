@@ -11,9 +11,11 @@ class DampingGCN(nn.Module):
             nn.ReLU()
         )
         
-        # Physics processing
+        # Physics processing with more capacity
         self.physics_encoder = nn.Sequential(
             nn.Linear(2, hidden_dim),  # [alpha, torque]
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU()
         )
         
@@ -28,8 +30,10 @@ class DampingGCN(nn.Module):
         # Combined processing
         self.combined_conv = GCNConv(hidden_dim * 2, hidden_dim)
         
-        # Final prediction
+        # Final prediction with more layers
         self.damping_predictor = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
             nn.Linear(hidden_dim, hidden_dim // 2),
             nn.ReLU(),
             nn.Linear(hidden_dim // 2, 1)
@@ -61,7 +65,7 @@ class DampingGCN(nn.Module):
         combined_features = torch.cat([state_features, physics_features], dim=1)
         combined_features = torch.relu(self.combined_conv(combined_features, edge_index))
         
-        # Predict damping
+        # Predict damping with physical constraints
         damping = self.damping_predictor(combined_features)
         damping = torch.sigmoid(damping) * (self.max_damping - self.min_damping) + self.min_damping
         

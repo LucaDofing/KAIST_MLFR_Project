@@ -42,42 +42,38 @@ def run_training(model, train_loader, test_loader, device, epochs=200, lr=1e-2, 
     for epoch in range(1, epochs + 1):
         # Training
         model.train()
-        train_metrics = {'loss': 0, 'damping_loss': 0, 'state_loss': 0}
+        train_loss = 0.0
         train_count = 0
         
         for data in train_loader:
             data = data.to(device)
-            metrics = train_step(model, optimizer, data)
-            
-            for k, v in metrics.items():
-                train_metrics[k] += v * data.num_nodes
+            loss = train_step(model, optimizer, data)
+            train_loss += loss * data.num_nodes
             train_count += data.num_nodes
         
-        # Average training metrics
-        train_metrics = {k: v/train_count for k, v in train_metrics.items()}
+        # Average training loss
+        train_loss = train_loss / train_count
         
         # Validation
         model.eval()
-        test_metrics = {'loss': 0, 'damping_loss': 0, 'state_loss': 0}
+        test_loss = 0.0
         test_count = 0
         
         for data in test_loader:
             data = data.to(device)
-            metrics = validate_step(model, data)
-            
-            for k, v in metrics.items():
-                test_metrics[k] += v * data.num_nodes
+            loss = validate_step(model, data)
+            test_loss += loss * data.num_nodes
             test_count += data.num_nodes
         
-        # Average test metrics
-        test_metrics = {k: v/test_count for k, v in test_metrics.items()}
+        # Average test loss
+        test_loss = test_loss / test_count
         
         # Update learning rate
-        scheduler.step(test_metrics['loss'])
+        scheduler.step(test_loss)
         
         # Early stopping
-        if test_metrics['loss'] < best_test_loss:
-            best_test_loss = test_metrics['loss']
+        if test_loss < best_test_loss:
+            best_test_loss = test_loss
             patience_counter = 0
         else:
             patience_counter += 1
@@ -88,11 +84,7 @@ def run_training(model, train_loader, test_loader, device, epochs=200, lr=1e-2, 
         
         # Print metrics
         if epoch % 5 == 0 or epoch == 1:
-            print(f"Epoch {epoch:3d} | "
-                  f"Train Loss: {train_metrics['loss']:.4f} "
-                  f"(D: {train_metrics['damping_loss']:.4f}, S: {train_metrics['state_loss']:.4f}) | "
-                  f"Test Loss: {test_metrics['loss']:.4f} "
-                  f"(D: {test_metrics['damping_loss']:.4f}, S: {test_metrics['state_loss']:.4f})")
+            print(f"Epoch {epoch:3d} | Train Loss: {train_loss:.4f} | Test Loss: {test_loss:.4f}")
     
     print("Training done.")
 
@@ -149,25 +141,13 @@ def train_step(model, optimizer, data):
     optimizer.zero_grad()
     
     # Get damping prediction
-    damping = model(data)  # Shape: [batch_size, 1]
-    
-    # Ensure target damping has the same shape
-    target_damping = data.y_true_damping.unsqueeze(-1)  # Add dimension to match [batch_size, 1]
+    damping = model(data)
     
     # Compute next state using full physics simulation
     next_state = model.compute_next_state(data, damping)
     
-    # Compute losses with proper scaling
-    damping_loss = F.mse_loss(damping, target_damping)  # Now both have shape [batch_size, 1]
-    state_loss = F.mse_loss(next_state, data.x_next)
-    
-    # Scale the losses to be of similar magnitude
-    # Damping is typically small (0-1), while state values can be larger
-    damping_scale = 10.0  # Increase weight of damping loss
-    state_scale = 1.0
-    
-    # Combined loss with scaling
-    loss = damping_scale * damping_loss + state_scale * state_loss
+    # Only use state prediction loss
+    loss = F.mse_loss(next_state, data.x_next)
     
     # Backward pass
     loss.backward()
@@ -177,11 +157,7 @@ def train_step(model, optimizer, data):
     
     optimizer.step()
     
-    return {
-        'loss': loss.item(),
-        'damping_loss': damping_loss.item(),
-        'state_loss': state_loss.item()
-    }
+    return loss.item()
 
 def validate_step(model, data):
     """Single validation step"""
@@ -189,27 +165,12 @@ def validate_step(model, data):
     
     with torch.no_grad():
         # Get damping prediction
-        damping = model(data)  # Shape: [batch_size, 1]
-        
-        # Ensure target damping has the same shape
-        target_damping = data.y_true_damping.unsqueeze(-1)  # Add dimension to match [batch_size, 1]
+        damping = model(data)
         
         # Compute next state using full physics simulation
         next_state = model.compute_next_state(data, damping)
         
-        # Compute losses with proper scaling
-        damping_loss = F.mse_loss(damping, target_damping)
-        state_loss = F.mse_loss(next_state, data.x_next)
-        
-        # Scale the losses to be of similar magnitude
-        damping_scale = 10.0
-        state_scale = 1.0
-        
-        # Combined loss with scaling
-        loss = damping_scale * damping_loss + state_scale * state_loss
+        # Only use state prediction loss
+        loss = F.mse_loss(next_state, data.x_next)
     
-    return {
-        'loss': loss.item(),
-        'damping_loss': damping_loss.item(),
-        'state_loss': state_loss.item()
-    }
+    return loss.item()
