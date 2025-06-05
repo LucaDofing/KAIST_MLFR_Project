@@ -8,15 +8,15 @@ class DampingGCN(nn.Module):
         # State processing
         self.state_encoder = nn.Sequential(
             nn.Linear(2, hidden_dim),  # [theta, omega]
-            nn.ReLU()
+            nn.Sigmoid()
         )
         
         # Physics processing with more capacity
         self.physics_encoder = nn.Sequential(
             nn.Linear(2, hidden_dim),  # [alpha, torque]
-            nn.ReLU(),
+            nn.Sigmoid(),
             nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU()
+            nn.Sigmoid()
         )
         
         # Graph convolutions for state
@@ -33,9 +33,9 @@ class DampingGCN(nn.Module):
         # Final prediction with more layers
         self.damping_predictor = nn.Sequential(
             nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(),
+            nn.Sigmoid(),
             nn.Linear(hidden_dim, hidden_dim // 2),
-            nn.ReLU(),
+            nn.Sigmoid(),
             nn.Linear(hidden_dim // 2, 1)
         )
         
