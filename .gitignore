@@ -1,4 +1,12 @@
+1_data_generation_and_controller/0_env_setup/2dlinksim
+1_data_generation_and_controller/4_data/2_mujoco
+KAIST_MLFR_Project/1_data_generation_and_controller/4_data/3_gymnasium
+*.pyc
+
+# add .venv to .gitignore
 .venv/
+1_data_generation_and_controller/4_data/1_xml_models
+data.venv/
 1_data_generation_and_controller
 data
 src/__pycache__
