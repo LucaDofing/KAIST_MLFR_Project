@@ -1,11 +1,12 @@
 import torch
 from torch import nn
 from torch_geometric.nn import GCNConv
+from src.config import INPUT_DIM, HIDDEN_DIM
 
 class DampingGCN(nn.Module):
-    def __init__(self, hidden_dim=64):
+    def __init__(self, hidden_dim=HIDDEN_DIM):
         super().__init__()
-        self.conv1 = GCNConv(2, hidden_dim)
+        self.conv1 = GCNConv(INPUT_DIM, hidden_dim)
         self.conv2 = GCNConv(hidden_dim, hidden_dim)
         self.conv3 = GCNConv(hidden_dim, hidden_dim)
         self.linear = nn.Linear(hidden_dim, 1)  # Output: estimated damping

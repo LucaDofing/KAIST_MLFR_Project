@@ -1,4 +1,3 @@
-
 # src/config.py
 
 # Dataset parameters
@@ -14,7 +13,7 @@ LEARNING_RATE = 1e-3
 WEIGHT_DECAY = 1e-5
 
 # Model parameters
-INPUT_DIM = 2              # (theta, omega)
+INPUT_DIM = 3              # (sin(theta), cos(theta), normalized_omega)
 HIDDEN_DIM = 64
 OUTPUT_DIM = 1             # Predict damping per node
 NUM_LAYERS = 3             # GCN layers
