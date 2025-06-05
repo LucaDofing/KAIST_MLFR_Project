@@ -110,6 +110,11 @@ class DataLogger:
             target_angle_rad = sim_params.get('target_angle', 0.0)
             self.data["static_properties"]["initial_angle_deg"] = float(np.rad2deg(initial_angle_rad))
             self.data["static_properties"]["target_angle_deg"] = float(np.rad2deg(target_angle_rad))
+            
+            # Store torque limit only (most realistic motor constraint)
+            self.data["static_properties"]["limits"] = {
+                "torque_limit_nm": float(sim_params.get('torque_limit', 100.0))
+            }
         
         # Extract properties for each link
         for i in range(num_links):
@@ -138,15 +143,40 @@ class DataLogger:
             damping = model.dof_damping[joint_id]  # Use dof_damping instead of jnt_damping
             friction = 0.0  # Default friction value
             
+            # Extract joint limits from model
+            joint_limited = bool(model.jnt_limited[joint_id])
+            joint_range_min = float(model.jnt_range[joint_id, 0]) if joint_limited else None
+            joint_range_max = float(model.jnt_range[joint_id, 1]) if joint_limited else None
+            
+            # Create limits section - only include user-defined limits
+            limits_section = {}
+            
+            # Add XML joint limits only if they exist
+            if joint_limited and joint_range_min is not None and joint_range_max is not None:
+                limits_section["xml_joint_range"] = {
+                    "limited": True,
+                    "min_rad": joint_range_min,
+                    "max_rad": joint_range_max,
+                    "min_deg": float(np.rad2deg(joint_range_min)),
+                    "max_deg": float(np.rad2deg(joint_range_max))
+                }
+            
+            # Add user-defined limits if sim_params exist
+            if sim_params is not None:
+                limits_section["torque_limit_nm"] = float(sim_params.get('torque_limit', 100.0))
+            
             # Store link properties
-            self.data["static_properties"]["nodes"].append({
+            node_properties = {
                 "mass": float(mass),
                 "length": float(length),
                 "radius": float(geom.size[0]),  # Add radius
                 "damping": float(damping),
                 "friction": float(friction),
-                "inertia": inertia  # Use model's inertia
-            })
+                "inertia": inertia,  # Use model's inertia
+                "limits": limits_section
+            }
+            
+            self.data["static_properties"]["nodes"].append(node_properties)
             
             # Add edge to kinematic chain
             if i > 0:
@@ -163,7 +193,9 @@ class DataLogger:
         # Extract current state
         current_theta = data.qpos[:model.nu].copy()
         current_omega = data.qvel[:model.nu].copy()
-        current_torque = data.ctrl[:model.nu].copy()
+        
+        # Log ACTUAL applied torques (limited by MuJoCo ctrlrange) instead of commanded torques
+        current_torque = data.actuator_force[:model.nu].copy()
         
         # Calculate acceleration (alpha) using finite differences
         if self.prev_omega is not None:

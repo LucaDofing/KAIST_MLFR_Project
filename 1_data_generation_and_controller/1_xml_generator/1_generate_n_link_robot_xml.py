@@ -2,6 +2,7 @@ import xml.etree.ElementTree as ET
 from xml.dom import minidom
 import argparse
 import os
+import math
 
 def create_n_link_robot_xml(
     # Default Parameters
@@ -11,11 +12,11 @@ def create_n_link_robot_xml(
     joint_range=(-200.0, 200.0),   # Range of motion for the second joint
     target_pos=(0.15, 0.15, 0.0),   # Fixed position for the target
     motor_gear=1.0,          # Gear ratio for the motors
-    motor_range=(-100.0, 100.0),   # Control range for the motors
+    torque_limit=25.0,         # Torque limit for motors in N⋅m (NEW PARAMETER)
     gravity=(0, 0, -9.81),     # Gravity vector (z-down)
     timestep=0.01,             # Simulation timestep
     integrator="implicit",          # Integration method
-    link_density=2000.0,       # Density of the links in kg/m³
+    link_mass=1.5,             # Mass of each link in kg (NEW PARAMETER)
     joint_damping=0.1,         # Damping coefficient for joints
     joint_friction=0.0,        # Friction coefficient for joints
     joint_armature=0.0,        # Armature inertia for joints
@@ -33,6 +34,25 @@ def create_n_link_robot_xml(
         "z_axis": "0.0 0.0 1.0 1"   # Blue for Z axis
     }
 ):
+    # Calculate density from desired link mass
+    # Link geometry: capsule = cylinder + 2 hemispheres
+    # Volume = π * r² * L + (4/3) * π * r³
+    cylinder_volume = math.pi * link_radius**2 * link_length
+    hemisphere_volume = (4/3) * math.pi * link_radius**3
+    total_volume = cylinder_volume + hemisphere_volume
+    link_density = link_mass / total_volume
+    
+    # Set motor range based on torque limit
+    motor_range = (-torque_limit, torque_limit)
+    
+    print(f"Link specifications:")
+    print(f"  Target mass: {link_mass:.3f} kg")
+    print(f"  Length: {link_length:.3f} m, Radius: {link_radius:.3f} m")
+    print(f"  Calculated volume: {total_volume:.6f} m³")
+    print(f"  Calculated density: {link_density:.1f} kg/m³")
+    print(f"Motor specifications:")
+    print(f"  Torque limit: ±{torque_limit:.1f} N⋅m")
+    
     # Create the root element
     root = ET.Element("mujoco", model="n_link_robot")
     
@@ -189,7 +209,8 @@ def main():
                       help="Directory to save the generated XML file")
     parser.add_argument("--link_length", type=float, default=0.15, help="Length of each link")
     parser.add_argument("--link_radius", type=float, default=0.01, help="Radius of each link")
-    parser.add_argument("--link_density", type=float, default=2000.0, help="Density of each link")
+    parser.add_argument("--link_mass", type=float, default=1.5, help="Mass of each link in kg")
+    parser.add_argument("--torque_limit", type=float, default=25.0, help="Torque limit for motors in N⋅m")
     parser.add_argument("--joint_damping", type=float, default=0.1, help="Damping coefficient for joints")
     parser.add_argument("--joint_friction", type=float, default=0.0, help="Friction coefficient for joints")
     args = parser.parse_args()
@@ -202,7 +223,8 @@ def main():
         n_links=args.num_links,
         link_length=args.link_length,
         link_radius=args.link_radius,
-        link_density=args.link_density,
+        link_mass=args.link_mass,
+        torque_limit=args.torque_limit,
         joint_damping=args.joint_damping,
         joint_friction=args.joint_friction
     )
