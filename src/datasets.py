@@ -156,7 +156,7 @@ class MuJoCoPendulumDataset(InMemoryDataset):
             true_length = torch.tensor([static_props['length']], dtype=torch.float32)
             true_damping_coeff = torch.tensor([static_props['damping']], dtype=torch.float32)
             true_friction = torch.tensor([static_props['friction']], dtype=torch.float32)
-            inertia_yy = torch.tensor([static_props['inertia'][1]], dtype=torch.float32)
+            inertia_yy = torch.tensor([static_props['inertia']], dtype=torch.float32)
             gravity_accel = torch.tensor([metadata['gravity'][2]], dtype=torch.float32)
 
             
