@@ -32,10 +32,16 @@ class ParameterSweep:
     def _create_robot_folder_name(self) -> str:
         """Create a descriptive folder name based on robot parameters."""
         params = self.robot_model
+        
+        # Include fingertip mass in folder name if specified
+        fingertip_suffix = ""
+        if params.get('fingertip_mass') is not None:
+            fingertip_suffix = f"_ftip{params['fingertip_mass']:.3f}"
+        
         folder_name = (f"robot_L{params['n_links']}_"
                       f"len{params['link_length']:.2f}_"
                       f"rad{params['link_radius']:.3f}_"
-                      f"mass{params['link_mass']:.1f}_"
+                      f"mass{params['link_mass']:.1f}{fingertip_suffix}_"
                       f"damp{params['joint_damping']:.2f}_"
                       f"torq{params['torque_limit']:.1f}")
         return folder_name
@@ -57,6 +63,13 @@ class ParameterSweep:
             "--torque_limit", str(self.robot_model["torque_limit"]),  # Add torque limit
             "--output_dir", self.xml_dir
         ]
+        
+        # Add fingertip_mass parameter if specified
+        if self.robot_model.get("fingertip_mass") is not None:
+            cmd.extend(["--fingertip_mass", str(self.robot_model["fingertip_mass"])])
+            print(f"Using specified fingertip mass: {self.robot_model['fingertip_mass']:.6f} kg")
+        else:
+            print(f"Using auto-calculated fingertip mass (from link density)")
         
         print(f"Generating XML for robot: {xml_filename}")
         subprocess.run(cmd, check=True)
@@ -122,6 +135,11 @@ class ParameterSweep:
         
         print(f"Creating dataset for robot: {robot_folder_name}")
         print(f"Data will be saved to: {robot_data_dir}")
+        
+        # Show robot configuration including fingertip mass
+        print(f"\nRobot configuration:")
+        for key, value in self.robot_model.items():
+            print(f"  {key}: {value}")
         
         # Generate XML for the robot model (only once)
         xml_path = self.generate_xml_for_robot()
