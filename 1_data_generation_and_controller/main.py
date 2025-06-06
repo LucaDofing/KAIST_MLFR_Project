@@ -83,13 +83,18 @@ class ParameterSweep:
     
     def run_simulation(self, xml_path: str, sim_params: Dict[str, Any], robot_data_dir: str) -> str:
         """Run a single simulation with given parameters."""
+        
+        # Get robot folder name
+        robot_folder_name = self._create_robot_folder_name()
+        
         cmd = [
             "python3", os.path.join(self.base_dir, "2_mujoco_sim/n_link_robot_mujoco.py"),
             "--xml_path", xml_path,
             "--sim_time", str(sim_params["sim_time"]),
             "--control_mode", sim_params["control_mode"],
             "--initial_angle", str(sim_params["initial_angle"]),
-            "--log", "1"
+            "--log", "1",
+            "--robot_folder_name", robot_folder_name
         ]
         
         if not self.render:
@@ -130,7 +135,7 @@ class ParameterSweep:
         """Run the complete parameter sweep for the defined robot model."""
         # Create robot-specific data directory
         robot_folder_name = self._create_robot_folder_name()
-        robot_data_dir = os.path.join(self.base_dir, "4_data/datasets", robot_folder_name)
+        robot_data_dir = os.path.join(self.base_dir, "4_data/2_mujoco/datasets", robot_folder_name)
         os.makedirs(robot_data_dir, exist_ok=True)
         
         print(f"Creating dataset for robot: {robot_folder_name}")

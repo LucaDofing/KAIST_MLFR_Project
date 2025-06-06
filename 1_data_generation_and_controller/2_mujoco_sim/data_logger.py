@@ -1,17 +1,37 @@
 import os
 import json
 import time
+import shutil
 import numpy as np
 import mujoco
 
 class DataLogger:
-    def __init__(self, save_dir="4_data/2_mujoco"):
-        """Initialize the data logger.
+    def __init__(self, robot_folder_name=None, simulation_run_name=None, base_save_dir="4_data/2_mujoco/datasets"):
+        """Initialize the data logger with data/ and info/ subfolders."""
+        self.base_save_dir = base_save_dir
+        self.robot_folder_name = robot_folder_name
+        self.simulation_run_name = simulation_run_name
         
-        Args:
-            save_dir (str): Directory to save the data files
-        """
-        self.save_dir = save_dir
+        # Create the robot folder structure with data/ and info/ subfolders
+        if robot_folder_name:
+            self.save_dir = os.path.join(base_save_dir, robot_folder_name)
+        else:
+            self.save_dir = base_save_dir
+        
+        # Create data/ and info/ subfolders
+        self.data_dir = os.path.join(self.save_dir, "data")
+        self.info_dir = os.path.join(self.save_dir, "info")
+        
+        # Create directories
+        os.makedirs(self.data_dir, exist_ok=True)
+        os.makedirs(self.info_dir, exist_ok=True)
+        
+        print(f"📁 Created simulation run structure:")
+        print(f"   📂 {self.save_dir}/")
+        print(f"   ├── 📂 data/     (trajectory JSON files)")
+        print(f"   └── 📂 info/     (metadata + XML model)")
+        
+        # Initialize data structure
         self.data = {
             "metadata": {
                 "num_links": 0,
@@ -19,7 +39,7 @@ class DataLogger:
                 "dt": 0.0,
                 "gravity": [0.0, 0.0, 0.0],
                 "solver": "Unknown",
-                "simulation_time": None  # Will be set when saving data
+                "simulation_time": None
             },
             "static_properties": {
                 "nodes": [],
@@ -41,12 +61,10 @@ class DataLogger:
         }
         self.prev_omega = None
         self.start_time = time.time()
-        
-        # Create save directory if it doesn't exist
-        os.makedirs(save_dir, exist_ok=True)
+        self.xml_model_path = None
         
     def _get_next_simulation_number(self):
-        """Get the next simulation number from a counter file."""
+        """Get the next simulation number from a counter file in simulation run directory."""
         counter_file = os.path.join(self.save_dir, "simulation_counter.txt")
         
         # Create counter file if it doesn't exist
@@ -71,7 +89,11 @@ class DataLogger:
             fcntl.flock(f.fileno(), fcntl.LOCK_UN)
             
         return counter
-        
+
+    def set_xml_model_path(self, xml_path):
+        """Store the XML model path for later copying to info directory."""
+        self.xml_model_path = xml_path
+
     def extract_static_properties(self, model, sim_params=None):
         """Extract static properties from the MuJoCo model.
         
@@ -226,30 +248,120 @@ class DataLogger:
         self.data["metadata"]["num_steps"] += 1
     
     def save_data(self):
-        """Save logged data to a JSON file with a descriptive name based on parameters."""
-        # Get next simulation number
-        sim_number = self._get_next_simulation_number()
+        """Save logged data to the organized folder structure."""
         
-        # Get parameters for filename
+        # Get parameters for filename (without simulation counter)
         num_links = self.data["metadata"]["num_links"]
         initial_angle = self.data["static_properties"]["initial_angle_deg"]
         target_angle = self.data["static_properties"]["target_angle_deg"]
         kp = self.data["static_properties"]["controller_gains"]["kp"]
         kd = self.data["static_properties"]["controller_gains"]["kd"]
         
-        # Get damping from first link (assuming all links have same damping)
+        # Get damping from first link
         damping = self.data["static_properties"]["nodes"][0]["damping"] if self.data["static_properties"]["nodes"] else 0.0
         
-        # Create descriptive filename with simulation ID
-        filename = f"sim_{sim_number:03d}_n_link_{num_links}_init_{initial_angle:.1f}_target_{target_angle:.1f}_kp_{kp:.1f}_kd_{kd:.3f}_damping_{damping:.3f}.json"
-        filepath = os.path.join(self.save_dir, filename)
+        # Create descriptive filename with timestamp instead of counter
+        import time
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        filename = f"trajectory_{timestamp}_n_link_{num_links}_init_{initial_angle:.1f}_target_{target_angle:.1f}_kp_{kp:.1f}_kd_{kd:.3f}_damping_{damping:.3f}.json"
+        filepath = os.path.join(self.data_dir, filename)
         
-        # Save to file
+        # Add simulation end time
+        self.data["metadata"]["simulation_time"] = time.time() - self.start_time
+        
+        # Save trajectory data to data/ folder
         with open(filepath, "w") as f:
             json.dump(self.data, f, indent=4)
-            
-        print(f"Data saved to {filepath}")
         
+        print(f"📄 Trajectory data saved: data/{filename}")
+        
+        # Copy XML model to info/ folder
+        if self.xml_model_path and os.path.exists(self.xml_model_path):
+            xml_filename = os.path.basename(self.xml_model_path)
+            xml_dst = os.path.join(self.info_dir, xml_filename)
+            
+            if not os.path.exists(xml_dst):
+                shutil.copy2(self.xml_model_path, xml_dst)
+                print(f"📄 XML model saved: info/{xml_filename}")
+        
+        # Create/update dataset metadata in info/ folder
+        self._save_dataset_metadata()
+        
+        return filepath
+
+    def _save_dataset_metadata(self):
+        """Create or update dataset metadata in info/ folder."""
+        metadata_path = os.path.join(self.info_dir, "dataset_metadata.json")
+        
+        print(f"DEBUG: Saving metadata to: {metadata_path}")
+        print(f"DEBUG: info_dir = {self.info_dir}")
+        
+        # Load existing metadata or create new
+        if os.path.exists(metadata_path):
+            with open(metadata_path, "r") as f:
+                dataset_metadata = json.load(f)
+        else:
+            dataset_metadata = {
+                "robot_name": self.robot_folder_name,
+                "creation_time": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "total_trajectories": 0,
+                "robot_parameters": {},
+                "simulation_parameters": {},
+                "trajectory_list": []
+            }
+        
+        # Extract robot parameters from first simulation
+        if self.data["static_properties"]["nodes"]:
+            node = self.data["static_properties"]["nodes"][0]
+            dataset_metadata["robot_parameters"] = {
+                "num_links": self.data["metadata"]["num_links"],
+                "mass": node["mass"],
+                "fingertip_mass": node["fingertip_mass"],
+                "length": node["length"],
+                "radius": node["radius"],
+                "damping": node["damping"],
+                "inertia": node["inertia"],
+                "torque_limit_nm": node.get("torque_limit_nm", 100.0)
+            }
+        
+        # Add simulation parameters
+        dataset_metadata["simulation_parameters"] = {
+            "dt": self.data["metadata"]["dt"],
+            "gravity": self.data["metadata"]["gravity"],
+            "solver": self.data["metadata"]["solver"]
+        }
+        
+        # Add current trajectory to list
+        trajectory_info = {
+            "initial_angle_deg": self.data["static_properties"]["initial_angle_deg"],
+            "target_angle_deg": self.data["static_properties"]["target_angle_deg"],
+            "controller_gains": self.data["static_properties"]["controller_gains"],
+            "num_steps": self.data["metadata"]["num_steps"],
+            "simulation_time": self.data["metadata"]["simulation_time"]
+        }
+        
+        # Update or append trajectory
+        existing_idx = None
+        for i, traj in enumerate(dataset_metadata["trajectory_list"]):
+            if traj["initial_angle_deg"] == trajectory_info["initial_angle_deg"] and traj["target_angle_deg"] == trajectory_info["target_angle_deg"]:
+                existing_idx = i
+                break
+        
+        if existing_idx is not None:
+            dataset_metadata["trajectory_list"][existing_idx] = trajectory_info
+        else:
+            dataset_metadata["trajectory_list"].append(trajectory_info)
+        
+        # Update total count
+        dataset_metadata["total_trajectories"] = len(dataset_metadata["trajectory_list"])
+        dataset_metadata["last_updated"] = time.strftime("%Y-%m-%d %H:%M:%S")
+        
+        # Save updated metadata
+        with open(metadata_path, "w") as f:
+            json.dump(dataset_metadata, f, indent=4)
+        
+        print(f"📄 Dataset metadata updated: info/dataset_metadata.json ({dataset_metadata['total_trajectories']} trajectories)")
+
     def clear_data(self):
         """Clear all logged data."""
         self.data = {

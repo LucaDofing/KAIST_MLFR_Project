@@ -212,6 +212,11 @@ def main():
     parser.add_argument("--show_limits_example", action="store_true",
                       help="Show example usage of automatic torque limit extraction and exit")
     
+    parser.add_argument("--robot_folder_name", type=str, default=None,
+                      help="Robot folder name for organized data structure")
+    parser.add_argument("--simulation_run_name", type=str, default=None, 
+                      help="Simulation run folder name with timestamp")
+    
     args = parser.parse_args()
 
     # Show example if requested
@@ -242,8 +247,12 @@ def main():
     # Initialize controller
     controller = create_controller(args.control_mode, model, data, **controller_params)
     
-    # Initialize data logger
-    logger = DataLogger()
+    # Initialize data logger with nested folder structure
+    logger = DataLogger(
+        robot_folder_name=args.robot_folder_name,
+        simulation_run_name=args.simulation_run_name
+    )
+    logger.set_xml_model_path(args.xml_path)
     
     # Store simulation parameters - use extracted torque limits
     sim_params = {
@@ -283,9 +292,10 @@ def main():
         logger.data["static_properties"]["controller_gains"] = {
             "kp": float(args.kp),
             "kd": float(args.kd),
-            "ki": float(0.0)  # Assuming ki is not provided in the arguments
+            "ki": float(0.0)
         }
         logger.save_data()
+        logger.save_xml_model(args.xml_path)
     
     print(f"Total Time: {sim_end_time-sim_start_time:.6f}")
 
