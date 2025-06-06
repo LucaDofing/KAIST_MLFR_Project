@@ -12,11 +12,12 @@ def create_n_link_robot_xml(
     joint_range=(-200.0, 200.0),   # Range of motion for the second joint
     target_pos=(0.15, 0.15, 0.0),   # Fixed position for the target
     motor_gear=1.0,          # Gear ratio for the motors
-    torque_limit=25.0,         # Torque limit for motors in N⋅m (NEW PARAMETER)
+    torque_limit=25.0,         # Torque limit for motors in N⋅m
     gravity=(0, 0, -9.81),     # Gravity vector (z-down)
     timestep=0.01,             # Simulation timestep
-    integrator="implicit",          # Integration method
-    link_mass=1.5,             # Mass of each link in kg (NEW PARAMETER)
+    integrator="implicit",     # Integration method
+    link_mass=1.5,             # Mass of each link in kg
+    fingertip_mass=None,       # Mass of fingertip/gripper in kg (NEW PARAMETER)
     joint_damping=0.1,         # Damping coefficient for joints
     joint_friction=0.0,        # Friction coefficient for joints
     joint_armature=0.0,        # Armature inertia for joints
@@ -34,22 +35,32 @@ def create_n_link_robot_xml(
         "z_axis": "0.0 0.0 1.0 1"   # Blue for Z axis
     }
 ):
-    # Calculate density from desired link mass
-    # Link geometry: capsule = cylinder + 2 hemispheres
-    # Volume = π * r² * L + (4/3) * π * r³
-    cylinder_volume = math.pi * link_radius**2 * link_length
-    hemisphere_volume = (4/3) * math.pi * link_radius**3
-    total_volume = cylinder_volume + hemisphere_volume
-    link_density = link_mass / total_volume
+    # Calculate fingertip mass if not specified
+    if fingertip_mass is None:
+        # Auto-calculate fingertip mass using same density as link
+        # Link geometry: capsule = cylinder + 2 hemispheres
+        cylinder_volume = math.pi * link_radius**2 * link_length
+        hemisphere_volume = (4/3) * math.pi * link_radius**3
+        link_volume = cylinder_volume + hemisphere_volume
+        link_density = link_mass / link_volume
+        
+        # Fingertip geometry: sphere
+        fingertip_volume = (4/3) * math.pi * link_radius**3
+        fingertip_mass = link_density * fingertip_volume
+        
+        print(f"Auto-calculated fingertip mass: {fingertip_mass:.6f} kg")
+    else:
+        print(f"Using specified fingertip mass: {fingertip_mass:.6f} kg")
     
     # Set motor range based on torque limit
     motor_range = (-torque_limit, torque_limit)
     
     print(f"Link specifications:")
-    print(f"  Target mass: {link_mass:.3f} kg")
+    print(f"  Mass: {link_mass:.3f} kg")
     print(f"  Length: {link_length:.3f} m, Radius: {link_radius:.3f} m")
-    print(f"  Calculated volume: {total_volume:.6f} m³")
-    print(f"  Calculated density: {link_density:.1f} kg/m³")
+    print(f"Fingertip specifications:")
+    print(f"  Mass: {fingertip_mass:.6f} kg")
+    print(f"  Radius: {link_radius:.3f} m")
     print(f"Motor specifications:")
     print(f"  Torque limit: ±{torque_limit:.1f} N⋅m")
     
@@ -163,12 +174,12 @@ def create_n_link_robot_xml(
             joint_attribs["range"] = f"{joint_range[0]} {joint_range[1]}"
         ET.SubElement(prev_body, "joint", **joint_attribs)
 
-        # Add geom
+        # Add geom - using MASS instead of DENSITY
         ET.SubElement(prev_body, "geom",
                      fromto=f"0 0 0 0 0 {link_length}",
                      name=f"link{i}", rgba=colors["links"],
                      size=str(link_radius), type="capsule",
-                     density=str(link_density))
+                     mass=str(link_mass))  # CHANGED: using mass instead of density
 
         # Add actuator for this joint
         ET.SubElement(actuator, "motor",
@@ -179,11 +190,12 @@ def create_n_link_robot_xml(
         # If this is the last link, add the fingertip here
         if i == n_links - 1:
             fingertip = ET.SubElement(prev_body, "body", name="fingertip", pos=f"0 0 {link_length}")
+            # Use specific fingertip mass - using MASS instead of DENSITY
             ET.SubElement(fingertip, "geom",
                          contype="0", name="fingertip",
                          pos="0 0 0", rgba=colors["fingertip"],
                          size=str(link_radius), type="sphere",
-                         density=str(link_density))
+                         mass=str(fingertip_mass))  # CHANGED: using mass instead of density
         else:
             # Otherwise, create the next body for the next link
             next_body = ET.SubElement(prev_body, "body", name=f"body{i+1}", pos=f"0 0 {link_length}")
@@ -210,6 +222,8 @@ def main():
     parser.add_argument("--link_length", type=float, default=0.15, help="Length of each link")
     parser.add_argument("--link_radius", type=float, default=0.01, help="Radius of each link")
     parser.add_argument("--link_mass", type=float, default=1.5, help="Mass of each link in kg")
+    parser.add_argument("--fingertip_mass", type=float, default=None, 
+                      help="Mass of fingertip/gripper in kg (if not specified, calculated from link density)")
     parser.add_argument("--torque_limit", type=float, default=25.0, help="Torque limit for motors in N⋅m")
     parser.add_argument("--joint_damping", type=float, default=0.1, help="Damping coefficient for joints")
     parser.add_argument("--joint_friction", type=float, default=0.0, help="Friction coefficient for joints")
@@ -224,6 +238,7 @@ def main():
         link_length=args.link_length,
         link_radius=args.link_radius,
         link_mass=args.link_mass,
+        fingertip_mass=args.fingertip_mass,
         torque_limit=args.torque_limit,
         joint_damping=args.joint_damping,
         joint_friction=args.joint_friction
@@ -235,6 +250,11 @@ def main():
         f.write(xml_str)
     
     print(f"Generated XML model with {args.num_links} links")
+    print(f"  Link mass: {args.link_mass} kg")
+    if args.fingertip_mass is not None:
+        print(f"  Fingertip mass: {args.fingertip_mass} kg (specified)")
+    else:
+        print(f"  Fingertip mass: auto-calculated from link density")
     print(f"Saved to: {output_file}")
 
 if __name__ == "__main__":
