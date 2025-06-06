@@ -79,6 +79,10 @@ class DataLogger:
             model: MuJoCo model
             sim_params (dict, optional): Dictionary containing simulation parameters
         """
+        # Initialize data for mass matrix calculation
+        data = mujoco.MjData(model)
+        mujoco.mj_step1(model, data)
+        
         # Get number of links (excluding the root and fingertip)
         num_links = model.nbody - 2  # Subtract root and fingertip
         
@@ -95,6 +99,12 @@ class DataLogger:
             mujoco.mjtIntegrator.mjINT_IMPLICITFAST: "ImplicitFast"
         }
         self.data["metadata"]["solver"] = solver_map.get(model.opt.integrator, "Unknown")
+        
+        # Extract fingertip mass (last body in the model)
+        fingertip_mass = 0.0
+        if model.nbody > num_links + 1:  # Check if fingertip exists
+            fingertip_body_id = model.nbody - 1  # Last body is fingertip
+            fingertip_mass = float(model.body_mass[fingertip_body_id])
         
         # Extract controller gains and angles from sim_params
         if sim_params is not None:
@@ -116,6 +126,17 @@ class DataLogger:
                 "torque_limit_nm": float(sim_params.get('torque_limit', 100.0))
             }
         
+        # ========================================================================
+        # MASS MATRIX INERTIA EXTRACTION (MuJoCo's actual values)
+        # ========================================================================
+        
+        # Get the full mass matrix from MuJoCo - this is what the physics engine actually uses
+        mass_matrix = np.zeros((model.nv, model.nv))
+        mujoco.mj_fullM(model, mass_matrix, data.qM)
+        
+        # For a single revolute joint, the (0,0) element is the rotational inertia
+        actual_inertia_from_mass_matrix = float(mass_matrix[0, 0])
+        
         # Extract properties for each link
         for i in range(num_links):
             body_id = i + 1  # Skip root body
@@ -129,9 +150,8 @@ class DataLogger:
             geom_id = model.body_geomadr[body_id]
             geom = model.geom(geom_id)
             
-            # Get mass and inertia directly from model
+            # Get mass and basic properties
             mass = model.body_mass[body_id]
-            inertia = model.body_inertia[body_id].tolist()
             
             # Get link length from geom
             if geom.type == mujoco.mjtGeom.mjGEOM_CAPSULE:
@@ -139,44 +159,34 @@ class DataLogger:
             else:
                 length = 0.0
                 
-            # Get damping and friction from joint defaults
-            damping = model.dof_damping[joint_id]  # Use dof_damping instead of jnt_damping
+            # Get damping from joint defaults
+            damping = model.dof_damping[joint_id]
             friction = 0.0  # Default friction value
             
-            # Extract joint limits from model
-            joint_limited = bool(model.jnt_limited[joint_id])
-            joint_range_min = float(model.jnt_range[joint_id, 0]) if joint_limited else None
-            joint_range_max = float(model.jnt_range[joint_id, 1]) if joint_limited else None
-            
-            # Create limits section - only include user-defined limits
-            limits_section = {}
-            
-            # Add XML joint limits only if they exist
-            if joint_limited and joint_range_min is not None and joint_range_max is not None:
-                limits_section["xml_joint_range"] = {
-                    "limited": True,
-                    "min_rad": joint_range_min,
-                    "max_rad": joint_range_max,
-                    "min_deg": float(np.rad2deg(joint_range_min)),
-                    "max_deg": float(np.rad2deg(joint_range_max))
-                }
-            
-            # Add user-defined limits if sim_params exist
-            if sim_params is not None:
-                limits_section["torque_limit_nm"] = float(sim_params.get('torque_limit', 100.0))
-            
-            # Store link properties
+            # Store clean node properties with only mass matrix inertia
             node_properties = {
                 "mass": float(mass),
+                "fingertip_mass": fingertip_mass,
                 "length": float(length),
-                "radius": float(geom.size[0]),  # Add radius
+                "radius": float(geom.size[0]),
                 "damping": float(damping),
                 "friction": float(friction),
-                "inertia": inertia,  # Use model's inertia
-                "limits": limits_section
+                "inertia": float(actual_inertia_from_mass_matrix),  # MuJoCo's actual inertia from mass matrix
             }
             
+            # Add limits if sim_params exist
+            if sim_params is not None:
+                node_properties["torque_limit_nm"] = float(sim_params.get('torque_limit', 100.0))
+            
             self.data["static_properties"]["nodes"].append(node_properties)
+            
+            # Print clean summary
+            print(f"\nLink {i} properties:")
+            print(f"  Mass: {mass:.3f} kg")
+            print(f"  Fingertip mass: {fingertip_mass:.3f} kg")
+            print(f"  Length: {length:.3f} m")
+            print(f"  Radius: {geom.size[0]:.3f} m")
+            print(f"  🎯 Inertia (mass matrix): {actual_inertia_from_mass_matrix:.8f} kg⋅m²")
             
             # Add edge to kinematic chain
             if i > 0:
@@ -300,3 +310,15 @@ class DataLogger:
         
         # Store all sweep parameters
         self.data["static_properties"]["sweep_params"] = sweep_params 
+
+def get_actual_mujoco_inertia(model):
+    """Get the actual inertia that MuJoCo uses for dynamics."""
+    data = mujoco.MjData(model)
+    mujoco.mj_step1(model, data)  # Initialize
+    
+    # Get the mass matrix
+    mass_matrix = np.zeros((model.nv, model.nv))
+    mujoco.mj_fullM(model, mass_matrix, data.qM)
+    
+    # For a single revolute joint, the [0,0] element is the rotational inertia
+    return mass_matrix[0, 0] 
