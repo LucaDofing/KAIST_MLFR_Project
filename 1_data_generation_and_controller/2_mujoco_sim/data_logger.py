@@ -14,24 +14,30 @@ class DataLogger:
         
         # Create the robot folder structure with data/ and info/ subfolders
         if robot_folder_name:
+            # Called from main.py - use structured approach
             self.save_dir = os.path.join(base_save_dir, robot_folder_name)
+            # Create data/ and info/ subfolders
+            self.data_dir = os.path.join(self.save_dir, "data")
+            self.info_dir = os.path.join(self.save_dir, "info")
+            
+            print(f"📁 Created simulation run structure:")
+            print(f"   📂 {self.save_dir}/")
+            print(f"   ├── 📂 data/     (trajectory JSON files)")
+            print(f"   └── 📂 info/     (metadata + XML model)")
         else:
-            self.save_dir = base_save_dir
-        
-        # Create data/ and info/ subfolders
-        self.data_dir = os.path.join(self.save_dir, "data")
-        self.info_dir = os.path.join(self.save_dir, "info")
+            # Called directly - use simple approach, save to relative path
+            self.save_dir = "4_data/2_mujoco"
+            self.data_dir = self.save_dir  # Save directly to the main directory
+            self.info_dir = self.save_dir  # Not used in direct mode
+            
+            print(f"📁 Direct mode - saving to: {self.save_dir}/")
         
         # Create directories
         os.makedirs(self.data_dir, exist_ok=True)
-        os.makedirs(self.info_dir, exist_ok=True)
+        if robot_folder_name:  # Only create info dir when using structured approach
+            os.makedirs(self.info_dir, exist_ok=True)
         
-        print(f"📁 Created simulation run structure:")
-        print(f"   📂 {self.save_dir}/")
-        print(f"   ├── 📂 data/     (trajectory JSON files)")
-        print(f"   └── 📂 info/     (metadata + XML model)")
-        
-        # Initialize data structure
+        # Initialize data structure (same for both modes)
         self.data = {
             "metadata": {
                 "num_links": 0,
@@ -93,6 +99,24 @@ class DataLogger:
     def set_xml_model_path(self, xml_path):
         """Store the XML model path for later copying to info directory."""
         self.xml_model_path = xml_path
+
+    def save_xml_model(self, xml_path):
+        """Copy the XML model to the info directory (only in structured mode)."""
+        if self.robot_folder_name:
+            # Only save XML in structured mode (called from main.py)
+            if xml_path and os.path.exists(xml_path):
+                xml_filename = "robot_model.xml"
+                dest_path = os.path.join(self.info_dir, xml_filename)
+                try:
+                    shutil.copy2(xml_path, dest_path)
+                    print(f"📄 XML model saved: info/{xml_filename}")
+                except Exception as e:
+                    print(f"⚠️  Warning: Could not save XML model: {e}")
+            else:
+                print("⚠️  Warning: XML path not provided or file does not exist")
+        else:
+            # Direct mode - skip XML saving
+            print("📄 Direct mode: XML model not saved")
 
     def extract_static_properties(self, model, sim_params=None):
         """Extract static properties from the MuJoCo model.
@@ -273,19 +297,23 @@ class DataLogger:
         with open(filepath, "w") as f:
             json.dump(self.data, f, indent=4)
         
-        print(f"📄 Trajectory data saved: data/{filename}")
+        print(f"📄 Trajectory data saved: {filepath}")
         
-        # Copy XML model to info/ folder
-        if self.xml_model_path and os.path.exists(self.xml_model_path):
-            xml_filename = os.path.basename(self.xml_model_path)
-            xml_dst = os.path.join(self.info_dir, xml_filename)
+        # Only do metadata stuff when called from main.py (robot_folder_name is not None)
+        if self.robot_folder_name:
+            # Copy XML model to info/ folder
+            if self.xml_model_path and os.path.exists(self.xml_model_path):
+                xml_filename = os.path.basename(self.xml_model_path)
+                xml_dst = os.path.join(self.info_dir, xml_filename)
+                
+                if not os.path.exists(xml_dst):
+                    shutil.copy2(self.xml_model_path, xml_dst)
+                    print(f"📄 XML model saved: info/{xml_filename}")
             
-            if not os.path.exists(xml_dst):
-                shutil.copy2(self.xml_model_path, xml_dst)
-                print(f"📄 XML model saved: info/{xml_filename}")
-        
-        # Create/update dataset metadata in info/ folder
-        self._save_dataset_metadata()
+            # Create/update dataset metadata in info/ folder
+            self._save_dataset_metadata()
+        else:
+            print("📄 Direct mode: Only trajectory saved, no metadata files created")
         
         return filepath
 
