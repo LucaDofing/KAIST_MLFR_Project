@@ -101,19 +101,10 @@ class DataLogger:
         self.xml_model_path = xml_path
 
     def save_xml_model(self, xml_path):
-        """Copy the XML model to the info directory (only in structured mode)."""
+        """Skip XML model copying to avoid duplicates (XML models are managed centrally)."""
         if self.robot_folder_name:
-            # Only save XML in structured mode (called from main.py)
-            if xml_path and os.path.exists(xml_path):
-                xml_filename = "robot_model.xml"
-                dest_path = os.path.join(self.info_dir, xml_filename)
-                try:
-                    shutil.copy2(xml_path, dest_path)
-                    print(f"📄 XML model saved: info/{xml_filename}")
-                except Exception as e:
-                    print(f"⚠️  Warning: Could not save XML model: {e}")
-            else:
-                print("⚠️  Warning: XML path not provided or file does not exist")
+            # Skip XML copying - models are managed centrally in 4_data/1_xml_models/
+            print(f"📄 XML model copy skipped (centrally managed in 4_data/1_xml_models/)")
         else:
             # Direct mode - skip XML saving
             print("📄 Direct mode: XML model not saved")

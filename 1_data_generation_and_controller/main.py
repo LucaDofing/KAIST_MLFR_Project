@@ -7,11 +7,21 @@ from typing import Dict, List, Any, Union
 import numpy as np
 from sweep_config import robot_model_params, simulation_sweep_params
 
+# Import the XML models directory function for consistency
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), "1_xml_generator"))
+import importlib.util
+spec = importlib.util.spec_from_file_location("xml_gen", os.path.join(os.path.dirname(__file__), "1_xml_generator", "1_generate_n_link_robot_xml.py"))
+xml_gen = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(xml_gen)
+
 class ParameterSweep:
     def __init__(self, render: bool = False, base_dir: str = None):
-        """Initialize the parameter sweep.
+        """
+        Initialize parameter sweep.
+        
         Args:
-            render (bool): Whether to render the simulation
+            render (bool): Whether to enable rendering during simulations.
             base_dir (str): Base directory for the project. If None, uses the directory of this script.
         """
         if base_dir is None:
@@ -19,11 +29,7 @@ class ParameterSweep:
         else:
             self.base_dir = base_dir
         
-        self.xml_dir = os.path.join(self.base_dir, "4_data/1_xml_models")
         self.render = render
-        
-        # Create directories if they don't exist
-        os.makedirs(self.xml_dir, exist_ok=True)
         
         # Use imported parameter configurations
         self.robot_model = robot_model_params
@@ -50,18 +56,21 @@ class ParameterSweep:
         """Generate XML file for the robot model."""
         # Create XML filename based on robot parameters
         xml_filename = f"{self._create_robot_folder_name()}.xml"
-        xml_path = os.path.join(self.xml_dir, xml_filename)
         
-        # Generate XML using link_mass instead of density
+        # Get the actual XML models directory (where files are really saved)
+        actual_xml_dir = xml_gen.get_xml_models_dir()
+        xml_path = os.path.join(actual_xml_dir, xml_filename)
+        
+        # Generate XML using the new parameter system
         cmd = [
             "python3", os.path.join(self.base_dir, "1_xml_generator/1_generate_n_link_robot_xml.py"),
             "--num_links", str(self.robot_model["n_links"]),
             "--link_length", str(self.robot_model["link_length"]),
             "--link_radius", str(self.robot_model["link_radius"]),
-            "--link_mass", str(self.robot_model["link_mass"]),  # Using mass instead of density
+            "--link_mass", str(self.robot_model["link_mass"]),
             "--joint_damping", str(self.robot_model["joint_damping"]),
-            "--torque_limit", str(self.robot_model["torque_limit"]),  # Add torque limit
-            "--output_dir", self.xml_dir
+            "--torque_limit", str(self.robot_model["torque_limit"]),
+            "--output_name", xml_filename  # Only pass filename, not output_dir since it uses absolute path
         ]
         
         # Add fingertip_mass parameter if specified
@@ -74,11 +83,7 @@ class ParameterSweep:
         print(f"Generating XML for robot: {xml_filename}")
         subprocess.run(cmd, check=True)
         
-        # Rename the default output to our specific filename
-        default_xml = os.path.join(self.xml_dir, "n_link_robot.xml")
-        if os.path.exists(default_xml):
-            os.rename(default_xml, xml_path)
-        
+        # Return the actual path where the file was saved
         return xml_path
     
     def run_simulation(self, xml_path: str, sim_params: Dict[str, Any], robot_data_dir: str) -> str:

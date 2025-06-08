@@ -4,37 +4,93 @@ import argparse
 import os
 import math
 
-def create_n_link_robot_xml(
-    # Default Parameters
-    n_links=1,
-    link_length=0.15,          # Length of each link
-    link_radius=0.01,          # Radius of the links
-    joint_range=(-200.0, 200.0),   # Range of motion for the second joint
-    target_pos=(0.15, 0.15, 0.0),   # Fixed position for the target
-    motor_gear=1.0,          # Gear ratio for the motors
-    torque_limit=25.0,         # Torque limit for motors in N⋅m
-    gravity=(0, 0, -9.81),     # Gravity vector (z-down)
-    timestep=0.01,             # Simulation timestep
-    integrator="implicit",     # Integration method
-    link_mass=1.5,             # Mass of each link in kg
-    fingertip_mass=None,       # Mass of fingertip/gripper in kg (NEW PARAMETER)
-    joint_damping=0.1,         # Damping coefficient for joints
-    joint_friction=0.0,        # Friction coefficient for joints
-    joint_armature=0.0,        # Armature inertia for joints
-    joint_stiffness=0.0,       # Joint stiffness
-    joint_springref=0.0,       # Joint spring reference position
-    colors={
-        "ground": "0.9 0.9 0.9 1",
-        "sides": "0.8 0.3 0.5 1",
-        "root": "0.8 0.3 0.5 1",
-        "links": "0.0 0.3 0.5 1",
-        "fingertip": "0.0 0.7 0.5 1",
-        "target": "0.8 0.1 0.1 1",
-        "x_axis": "1.0 0.0 0.0 1",  # Red for X axis
-        "y_axis": "0.0 1.0 0.0 1",  # Green for Y axis
-        "z_axis": "0.0 0.0 1.0 1"   # Blue for Z axis
+# Import default parameters
+try:
+    from parameters import get_default_params, print_default_config
+    DEFAULT_PARAMS = get_default_params()
+except ImportError:
+    print("Warning: parameters.py not found. Using hardcoded defaults.")
+    DEFAULT_PARAMS = {
+        "n_links": 1,
+        "link_length": 0.15,
+        "link_radius": 0.01,
+        "link_mass": 1.5,
+        "fingertip_mass": None,
+        "joint_damping": 0.1,
+        "joint_friction": 0.0,
+        "joint_armature": 0.0,
+        "joint_stiffness": 0.0,
+        "joint_springref": 0.0,
+        "joint_range": (-200.0, 200.0),
+        "torque_limit": 25.0,
+        "motor_gear": 1.0,
+        "timestep": 0.01,
+        "integrator": "implicit",
+        "gravity": (0, 0, -9.81),
+        "output_dir": ".",
+        "output_name": "n_link_robot.xml",
+        "target_pos": (0.15, 0.15, 0.0),
+        "colors": {
+            "ground": "0.9 0.9 0.9 1",
+            "sides": "0.8 0.3 0.5 1",
+            "root": "0.8 0.3 0.5 1",
+            "links": "0.0 0.3 0.5 1",
+            "fingertip": "0.0 0.7 0.5 1",
+            "target": "0.8 0.1 0.1 1",
+            "x_axis": "1.0 0.0 0.0 1",
+            "y_axis": "0.0 1.0 0.0 1",
+            "z_axis": "0.0 0.0 1.0 1"
+        }
     }
-):
+
+def get_xml_models_dir():
+    """
+    Get the absolute path to the XML models directory.
+    This ensures files are saved to the correct location regardless of where the script is called from.
+    """
+    # Get the directory where this script is located
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    # Navigate to the target directory: ../4_data/1_xml_models/
+    xml_models_dir = os.path.join(script_dir, "..", "4_data", "1_xml_models")
+    # Return the absolute path
+    return os.path.abspath(xml_models_dir)
+
+def create_n_link_robot_xml(**kwargs):
+    """
+    Create an n-link robot XML model for MuJoCo.
+    
+    Parameters are loaded in this order (later overrides earlier):
+    1. Default values from parameters.py
+    2. Keyword arguments passed to this function
+    
+    This allows main.py and command line arguments to override defaults.
+    """
+    # Start with default parameters
+    params = DEFAULT_PARAMS.copy()
+    
+    # Override with any provided kwargs
+    params.update(kwargs)
+    
+    # Extract individual parameters for readability
+    n_links = params["n_links"]
+    link_length = params["link_length"]
+    link_radius = params["link_radius"]
+    link_mass = params["link_mass"]
+    fingertip_mass = params["fingertip_mass"]
+    joint_damping = params["joint_damping"]
+    joint_friction = params["joint_friction"]
+    joint_armature = params["joint_armature"]
+    joint_stiffness = params["joint_stiffness"]
+    joint_springref = params["joint_springref"]
+    joint_range = params["joint_range"]
+    torque_limit = params["torque_limit"]
+    motor_gear = params["motor_gear"]
+    timestep = params["timestep"]
+    integrator = params["integrator"]
+    gravity = params["gravity"]
+    target_pos = params["target_pos"]
+    colors = params["colors"]
+
     # Calculate fingertip mass if not specified
     if fingertip_mass is None:
         # Auto-calculate fingertip mass using same density as link
@@ -214,48 +270,122 @@ def create_n_link_robot_xml(
     return xmlstr
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate an n-link robot XML model for MuJoCo")
-    parser.add_argument("--num_links", type=int, default=2,
-                      help="Number of links in the robot (default: 2)")
-    parser.add_argument("--output_dir", type=str, default="4_data/1_xml_models",
-                      help="Directory to save the generated XML file")
-    parser.add_argument("--link_length", type=float, default=0.15, help="Length of each link")
-    parser.add_argument("--link_radius", type=float, default=0.01, help="Radius of each link")
-    parser.add_argument("--link_mass", type=float, default=1.5, help="Mass of each link in kg")
-    parser.add_argument("--fingertip_mass", type=float, default=None, 
-                      help="Mass of fingertip/gripper in kg (if not specified, calculated from link density)")
-    parser.add_argument("--torque_limit", type=float, default=25.0, help="Torque limit for motors in N⋅m")
-    parser.add_argument("--joint_damping", type=float, default=0.1, help="Damping coefficient for joints")
-    parser.add_argument("--joint_friction", type=float, default=0.0, help="Friction coefficient for joints")
-    args = parser.parse_args()
-    
-    # Create output directory if it doesn't exist
-    os.makedirs(args.output_dir, exist_ok=True)
-    
-    # Generate XML
-    xml_str = create_n_link_robot_xml(
-        n_links=args.num_links,
-        link_length=args.link_length,
-        link_radius=args.link_radius,
-        link_mass=args.link_mass,
-        fingertip_mass=args.fingertip_mass,
-        torque_limit=args.torque_limit,
-        joint_damping=args.joint_damping,
-        joint_friction=args.joint_friction
+    parser = argparse.ArgumentParser(
+        description="Generate an n-link robot XML model for MuJoCo",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Generate using all default parameters
+  python3 1_generate_n_link_robot_xml.py
+
+  # View current default configuration
+  python3 parameters.py
+
+  # Generate 2-link robot with custom parameters
+  python3 1_generate_n_link_robot_xml.py --num_links 2 --link_mass 3.0
+
+  # Generate industrial robot
+  python3 1_generate_n_link_robot_xml.py --link_length 0.5 --torque_limit 100.0
+        """
     )
     
-    # Save to file
-    output_file = os.path.join(args.output_dir, "n_link_robot.xml")
+    # Robot Structure Parameters
+    parser.add_argument("--num_links", type=int, default=DEFAULT_PARAMS["n_links"],
+                       help=f"Number of links in the robot (default: {DEFAULT_PARAMS['n_links']})")
+    parser.add_argument("--link_length", type=float, default=DEFAULT_PARAMS["link_length"],
+                       help=f"Length of each link in meters (default: {DEFAULT_PARAMS['link_length']})")
+    parser.add_argument("--link_radius", type=float, default=DEFAULT_PARAMS["link_radius"],
+                       help=f"Radius of each link in meters (default: {DEFAULT_PARAMS['link_radius']})")
+    parser.add_argument("--link_mass", type=float, default=DEFAULT_PARAMS["link_mass"],
+                       help=f"Mass of each link in kg (default: {DEFAULT_PARAMS['link_mass']})")
+    parser.add_argument("--fingertip_mass", type=float, default=DEFAULT_PARAMS["fingertip_mass"],
+                       help="Mass of fingertip/gripper in kg (default: auto-calculated from link density)")
+    
+    # Joint Parameters
+    parser.add_argument("--joint_damping", type=float, default=DEFAULT_PARAMS["joint_damping"],
+                       help=f"Joint damping coefficient (default: {DEFAULT_PARAMS['joint_damping']})")
+    parser.add_argument("--joint_friction", type=float, default=DEFAULT_PARAMS["joint_friction"],
+                       help=f"Joint friction coefficient (default: {DEFAULT_PARAMS['joint_friction']})")
+    parser.add_argument("--joint_armature", type=float, default=DEFAULT_PARAMS["joint_armature"],
+                       help=f"Joint armature inertia (default: {DEFAULT_PARAMS['joint_armature']})")
+    parser.add_argument("--joint_stiffness", type=float, default=DEFAULT_PARAMS["joint_stiffness"],
+                       help=f"Joint stiffness (default: {DEFAULT_PARAMS['joint_stiffness']})")
+    parser.add_argument("--joint_springref", type=float, default=DEFAULT_PARAMS["joint_springref"],
+                       help=f"Joint spring reference position (default: {DEFAULT_PARAMS['joint_springref']})")
+    parser.add_argument("--joint_range", type=float, nargs=2, default=DEFAULT_PARAMS["joint_range"],
+                       metavar=('MIN', 'MAX'),
+                       help=f"Joint range in degrees (min max) (default: {DEFAULT_PARAMS['joint_range']})")
+    
+    # Actuator Parameters
+    parser.add_argument("--torque_limit", type=float, default=DEFAULT_PARAMS["torque_limit"],
+                       help=f"Maximum torque in N⋅m (default: {DEFAULT_PARAMS['torque_limit']})")
+    parser.add_argument("--motor_gear", type=float, default=DEFAULT_PARAMS["motor_gear"],
+                       help=f"Motor gear ratio (default: {DEFAULT_PARAMS['motor_gear']})")
+    
+    # Physics Parameters
+    parser.add_argument("--timestep", type=float, default=DEFAULT_PARAMS["timestep"],
+                       help=f"Simulation timestep in seconds (default: {DEFAULT_PARAMS['timestep']})")
+    parser.add_argument("--integrator", type=str, default=DEFAULT_PARAMS["integrator"],
+                       choices=["implicit", "explicit"],
+                       help=f"Integration method (default: {DEFAULT_PARAMS['integrator']})")
+    parser.add_argument("--gravity", type=float, nargs=3, default=DEFAULT_PARAMS["gravity"],
+                       metavar=('X', 'Y', 'Z'),
+                       help=f"Gravity vector (x y z) (default: {DEFAULT_PARAMS['gravity']})")
+    
+    # Output Parameters
+    parser.add_argument("--output_dir", type=str, default=DEFAULT_PARAMS["output_dir"],
+                       help=f"Directory to save the generated XML file (default: {DEFAULT_PARAMS['output_dir']})")
+    parser.add_argument("--output_name", type=str, default=DEFAULT_PARAMS["output_name"],
+                       help=f"Filename for the XML file (default: {DEFAULT_PARAMS['output_name']})")
+    
+    # Special options
+    parser.add_argument("--show_config", action="store_true",
+                       help="Show current default configuration and exit")
+    
+    args = parser.parse_args()
+    
+    # Show configuration if requested
+    if args.show_config:
+        print_default_config()
+        return
+    
+    # Get the absolute path to XML models directory (ignores args.output_dir for consistency)
+    xml_models_dir = get_xml_models_dir()
+    
+    # Create output directory if it doesn't exist
+    os.makedirs(xml_models_dir, exist_ok=True)
+    
+    # Convert parsed arguments to parameter dictionary
+    xml_params = {
+        "n_links": args.num_links,
+        "link_length": args.link_length,
+        "link_radius": args.link_radius,
+        "link_mass": args.link_mass,
+        "fingertip_mass": args.fingertip_mass,
+        "joint_damping": args.joint_damping,
+        "joint_friction": args.joint_friction,
+        "joint_armature": args.joint_armature,
+        "joint_stiffness": args.joint_stiffness,
+        "joint_springref": args.joint_springref,
+        "joint_range": tuple(args.joint_range),
+        "torque_limit": args.torque_limit,
+        "motor_gear": args.motor_gear,
+        "timestep": args.timestep,
+        "integrator": args.integrator,
+        "gravity": tuple(args.gravity),
+    }
+    
+    # Generate XML using parameters
+    xml_str = create_n_link_robot_xml(**xml_params)
+    
+    # Save to file using absolute path
+    output_file = os.path.join(xml_models_dir, args.output_name)
     with open(output_file, "w") as f:
         f.write(xml_str)
     
-    print(f"Generated XML model with {args.num_links} links")
-    print(f"  Link mass: {args.link_mass} kg")
-    if args.fingertip_mass is not None:
-        print(f"  Fingertip mass: {args.fingertip_mass} kg (specified)")
-    else:
-        print(f"  Fingertip mass: auto-calculated from link density")
-    print(f"Saved to: {output_file}")
+    print(f"\n✅ Generated XML model with {args.num_links} links")
+    print(f"📁 Saved to: {output_file}")
+    print(f"💡 View default config with: python3 parameters.py")
 
 if __name__ == "__main__":
     main() 
