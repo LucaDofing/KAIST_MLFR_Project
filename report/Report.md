@@ -1,12 +1,14 @@
-# MuJoCo Modular Robotic Simulation Framework
+# GNNSys Id: Learning Physical Parameters from Motion Using Graph Neural Networks for Robot Control
+## 1. Introduction 
 
-## 1. Introduction
+Robots frequently encounter unpredictable internal mechanics like friction and micro slip, which are hard to model and harm performance. Instead of manual calibration or external sensors, this project uses simulation based Graph Neural Networks to identify internal dynamics from motion data in a self supervised manner, efficiently addressing limited computational resources.
 
-This project presents a modular MuJoCo-based simulation framework designed for n-link robotic manipulator analysis. The system automatically generates and configures robotic chains with variable link counts, enabling systematic study of multi-joint dynamics and control strategies.
 
-The framework's key strength lies in its **modular architecture** that can automatically instantiate robotic manipulators ranging from simple single-link pendulums to complex multi-link chains, all while maintaining consistent physics modeling and control interfaces. The goal is to provide a compute effective method for generating trajectories for a modular robot design architecture, such that the GNN can learn with these trajectories. 
 
 ## 2. MuJoCo Simulation System
+
+MuJoCo was chosen for its computational efficiency, broad use in the reinforcement learning community, and smooth integration with the JAX framework. Its performance and flexibility make it ideal for robotic simulation and trajectory generation, as noted in recent reviews ([Kaup et al., 2024](https://arxiv.org/pdf/2407.08590.pdf)).
+
 
 ### 2.1 Modular N-Link Architecture
 
@@ -99,37 +101,37 @@ Parameter Space → XML Generation → MuJoCo Engine → PD Control → Data Exp
 ```
 
 
-### 3.0 Debugging
+### 2.5 Debugging
 
 - **Flexible Render Modes**: Execute simulation in visual mode for trajectory inspection and physical plausibility validation, or headless mode for rapid automated testing and data generation
 - **Accelerated Validation**: Speed up simulation playback to quickly assess trajectory behavior and validate parameter configurations across longer time horizons
 
 
-### 4.Feature Work
+### 2.6.Feature Work
 
-#### 4.1 Intelligent Data Collection
+#### 2.6.1 Intelligent Data Collection
 - **Trajectory Quality Assessment**: Automatically evaluate data richness and truncate trajectories at steady-state
 - **Richness Metrics**: Implement measures for state space coverage, frequency content, and control effort diversity
 
-#### 4.2 Realistic Signal Modeling
+#### 2.6.2 Realistic Signal Modeling
 - **Sensor Noise**: Add realistic jitter to position, velocity, and torque measurements
 - **Communication Effects**: Include delays, sampling limitations, and actuator response characteristics
 - **Signal Processing**: Model discrete-time effects and filtering artifacts
 
-#### 4.3 Advanced Physical Models
+#### 2.6.3 Advanced Physical Models
 - **Enhanced Damping**: Non-linear damping models
 - **Comprehensive Friction**: Stiction, Stribeck Model
 - **Gear Train Effects**: Backlash
 
-#### 4.4 Data Pipeline Improvements
+#### 2.6.4 Data Pipeline Improvements
 - **Active Learning**: Intelligent parameter space exploration
 - **Real-time Monitoring**: Online trajectory quality assessment
 
+## 3. GNN Design
+### 3.1 [Your GNN subsections here]
+### 3.2 [Your GNN subsections here]
+### 3.3 [Your GNN subsections here]
 
-
-# Example Equation
-This is an example on how to implelment Equations in Markdown
-$I = \frac{1}{12}m(3r^2 + L^2)$ where $m$ is mass, $r$ is radius, and $L$ is length.
 
 
 
