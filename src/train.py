@@ -7,24 +7,28 @@ from src.config import NUM_EPOCHS, LEARNING_RATE, WEIGHT_DECAY
 import torch.nn.functional as F
 
 
-def simulate_step(x, estimated_damping, dt): # dt is now an argument
-    theta, omega = x[:, 0], x[:, 1]
+def simulate_step(x, estimated_damping, dt, omega_mean=0.0, omega_std=1.0): # dt is now an argument
+    # Extract theta and omega from sin/cos representation and normalized omega
+    sin_theta, cos_theta, omega_norm = x[:, 0], x[:, 1], x[:, 2]
+    theta = torch.atan2(sin_theta, cos_theta)
+    omega = omega_norm * omega_std + omega_mean  # Denormalize omega
     
     # Ensure estimated_damping has the correct shape for broadcasting if x is batched
-    # x shape: [num_nodes_in_batch, 2]
+    # x shape: [num_nodes_in_batch, 3]
     # estimated_damping shape: [num_nodes_in_batch, 1]
     damping = estimated_damping.squeeze(-1) # Squeeze the last dim: [N]
 
-    # Simplified physics model (same as your FakePendulumDataset's implicit assumption)
-    # omega_next = omega - damping * omega * dt # Explicit Euler for omega
-    # theta_next = theta + omega * dt           # Explicit Euler for theta
-
-    # OR, the model from your current train.py (semi-implicit Euler for theta)
+    # Semi-implicit Euler integration
     domega_dt = -damping * omega # This is an angular acceleration if I=1
     omega_next = omega + domega_dt * dt
     theta_next = theta + omega_next * dt # Uses updated omega
 
-    return torch.stack([theta_next, omega_next], dim=1)
+    # Convert back to sin/cos and normalized omega
+    sin_theta_next = torch.sin(theta_next)
+    cos_theta_next = torch.cos(theta_next)
+    omega_next_norm = (omega_next - omega_mean) / omega_std
+
+    return torch.stack([sin_theta_next, cos_theta_next, omega_next_norm], dim=1)
 
 
 def run_training(model, train_loader, test_loader, device, epochs=200, lr=1e-2, weight_decay=1e-5):
@@ -89,8 +93,12 @@ def run_training(model, train_loader, test_loader, device, epochs=200, lr=1e-2, 
     print("Training done.")
 
 
-def simulate_step_physical(x, applied_torque, estimated_b, dt, mass, length_com_for_gravity, inertia_yy, gravity_accel):
-    theta, omega = x[:, 0], x[:, 1]
+def simulate_step_physical(x, applied_torque, estimated_b, dt, mass, length_com_for_gravity, inertia_yy, gravity_accel, omega_mean=0.0, omega_std=1.0):
+    # Extract theta and omega from sin/cos representation and normalized omega
+    sin_theta, cos_theta, omega_norm = x[:, 0], x[:, 1], x[:, 2]
+    theta = torch.atan2(sin_theta, cos_theta)
+    omega = omega_norm * omega_std + omega_mean  # Denormalize omega
+    
     b_estimated = estimated_b.squeeze(-1)
     mass_sq = mass.squeeze(-1)
     length_com_sq = length_com_for_gravity.squeeze(-1)
@@ -99,16 +107,6 @@ def simulate_step_physical(x, applied_torque, estimated_b, dt, mass, length_com_
     g = gravity_accel.squeeze(-1) # Should be scalar or same dim as others
 
     # Torque due to gravity
-    # Assuming theta is angle from horizontal X-axis, for a Y-axis hinge, gravity in -Z
-    # Torque_gravity_about_Y = CoM_x_world * Force_z_world
-    # CoM_x_world = length_com_sq * cos(theta)
-    # Force_z_world = -mass_sq * g
-    # torque_gravity = length_com_sq * torch.cos(theta) * (-mass_sq * g) # This seems to be the standard
-    # Let's re-verify standard pendulum equation: I * alpha = -m*g*L*sin(theta_from_vertical) - b*omega
-    # If your theta is angle from horizontal X-axis:
-    # sin(theta_from_vertical) = cos(theta_from_horizontal)
-    # So, torque_gravity = -mass_sq * g * length_com_sq * torch.cos(theta) # if theta is from horizontal
-    # OR, if theta is from vertical:
     torque_gravity = -mass_sq * g * length_com_sq * torch.sin(theta) # if theta is from vertical
 
     torque_damping = -b_estimated * omega
@@ -120,20 +118,12 @@ def simulate_step_physical(x, applied_torque, estimated_b, dt, mass, length_com_
     omega_next = omega + alpha * dt
     theta_next = theta + omega_next * dt 
 
-    return torch.stack([theta_next, omega_next], dim=1)
+    # Convert back to sin/cos and normalized omega
+    sin_theta_next = torch.sin(theta_next)
+    cos_theta_next = torch.cos(theta_next)
+    omega_next_norm = (omega_next - omega_mean) / omega_std
 
-# ... run_training function (update the call to simulate_step_physical) ...
-# Inside run_epoch:
-# pred_next = simulate_step_physical(
-#     x=data.x,
-#     applied_torque=data.applied_torque_t,
-#     estimated_b=estimated_b_coeff, # GNN now predicts 'b'
-#     dt=current_dt,
-#     mass=data.mass,
-#     length_com_for_gravity=data.length_com_for_gravity,
-#     inertia_yy=data.inertia_yy,
-#     gravity_accel=data.gravity_accel # Pass gravity
-# )
+    return torch.stack([sin_theta_next, cos_theta_next, omega_next_norm], dim=1)
 
 def train_step(model, optimizer, data):
     """Single training step"""

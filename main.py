@@ -64,6 +64,8 @@ def main():
             estimated_b_coeff = pred_damping.squeeze()  # <--- hier hinzugefügt
 
             sample_dt = sample.dt_step.item()
+            omega_mean = sample.omega_mean.item()
+            omega_std = sample.omega_std.item()
 
             pred_next = simulate_step_physical(
                 x=sample.x,
@@ -73,15 +75,17 @@ def main():
                 mass=sample.true_mass,
                 length_com_for_gravity=sample.true_length,
                 inertia_yy=sample.inertia_yy,
-                gravity_accel=sample.gravity_accel
+                gravity_accel=sample.gravity_accel,
+                omega_mean=omega_mean,
+                omega_std=omega_std
             )
 
         print("\nSample prediction (unsupervised):")
-        print("Current state θ, ω:")
+        print("Current state (sin(θ), cos(θ), ω_norm):")
         print(sample.x.cpu().numpy())
-        print("Predicted next state θ_next, ω_next:")
+        print("Predicted next state (sin(θ), cos(θ), ω_norm):")
         print(pred_next.cpu().numpy())
-        print("True next state θ_next, ω_next (from MuJoCo):")
+        print("True next state (sin(θ), cos(θ), ω_norm) (from MuJoCo):")
         print(sample.x_next.cpu().numpy())
         print("Estimated damping per joint (from GNN):")
         print(pred_damping.squeeze().cpu().numpy())
@@ -93,7 +97,7 @@ def main():
         if hasattr(sample, 'y_true_damping_b'):
             print("True physical damping coeff 'b' (from JSON):")
             print(sample.y_true_damping_b.cpu().numpy())
-        print(f"  (using mass: {sample.mass.item():.4f}, L_com_gravity: {sample.length_com_for_gravity.item():.4f}, I_yy: {sample.inertia_yy.item():.6e}, dt: {sample.dt_step.item()}, g: {sample.gravity_accel.item()})")
+        print(f"  (using mass: {sample.mass.item():.4f}, L_com_gravity: {sample.length_com_for_gravity.item():.4f}, I_yy: {sample.inertia_yy.item():.6e}, dt: {sample.dt_step.item()}, g: {sample.gravity_accel.item()}, omega_mean: {omega_mean:.4f}, omega_std: {omega_std:.4f})")
 
 if __name__ == "__main__":
     main()

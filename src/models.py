@@ -1,13 +1,14 @@
 import torch
 from torch import nn
 from torch_geometric.nn import GCNConv
+from src.config import INPUT_DIM
 
 class DampingGCN(nn.Module):
     def __init__(self, hidden_dim=64):
         super().__init__()
         # State processing
         self.state_encoder = nn.Sequential(
-            nn.Linear(2, hidden_dim),  # [theta, omega]
+            nn.Linear(INPUT_DIM, hidden_dim),  # [sin(theta), cos(theta), normalized_omega]
             nn.Sigmoid()
         )
         
@@ -45,13 +46,13 @@ class DampingGCN(nn.Module):
         
     def forward(self, data):
         # Extract features
-        theta_omega = data.x  # [theta, omega]
+        x = data.x  # [sin(theta), cos(theta), normalized_omega]
         alpha = data.true_alpha_t  # angular acceleration
         torque = data.true_torque_t  # applied torque
         edge_index = data.edge_index
         
         # Process state information
-        state_features = self.state_encoder(theta_omega)
+        state_features = self.state_encoder(x)
         state_features = torch.relu(self.conv1(state_features, edge_index))
         state_features = torch.relu(self.conv2(state_features, edge_index))
         
@@ -73,7 +74,10 @@ class DampingGCN(nn.Module):
     
     def compute_next_state(self, data, damping):
         """Compute next state using full physical simulation"""
-        theta, omega = data.x[:, 0], data.x[:, 1]
+        # Extract original theta and omega from sin(theta) and cos(theta)
+        theta = torch.atan2(data.x[:, 0], data.x[:, 1])  # atan2(sin(theta), cos(theta))
+        omega = data.x[:, 2] * data.omega_std + data.omega_mean  # Denormalize omega
+        
         dt = data.dt_step
         mass = data.true_mass
         length = data.true_length
@@ -93,4 +97,9 @@ class DampingGCN(nn.Module):
         omega_next = omega + alpha * dt
         theta_next = theta + omega_next * dt
         
-        return torch.stack([theta_next, omega_next], dim=1)
+        # Convert back to sin(theta), cos(theta), normalized_omega format
+        sin_theta_next = torch.sin(theta_next)
+        cos_theta_next = torch.cos(theta_next)
+        omega_next_norm = (omega_next - data.omega_mean) / data.omega_std
+        
+        return torch.stack([sin_theta_next, cos_theta_next, omega_next_norm], dim=1)

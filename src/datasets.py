@@ -35,7 +35,16 @@ class FakePendulumDataset(InMemoryDataset):
         theta = torch.empty(n).uniform_(-math.pi, math.pi)
         omega = torch.randn(n) * (1.0 - damping.squeeze()) * 3.0
 
-        features = torch.stack([theta, omega], dim=1)
+        # Transform theta to sin/cos representation
+        sin_theta = torch.sin(theta)
+        cos_theta = torch.cos(theta)
+        
+        # Calculate omega statistics (assuming mean=0, std=1 for this synthetic data)
+        omega_mean = 0.0
+        omega_std = 1.0
+        omega_normalized = omega / omega_std
+        
+        features = torch.stack([sin_theta, cos_theta, omega_normalized], dim=1)
 
         if n == 1:
             edge_index = torch.empty((2,0), dtype=torch.long)
@@ -46,7 +55,8 @@ class FakePendulumDataset(InMemoryDataset):
                 [torch.stack([send, recv], dim=0),
                  torch.stack([recv, send], dim=0)], dim=1)
 
-        return Data(x=features, y=damping, edge_index=edge_index)
+        return Data(x=features, y=damping, edge_index=edge_index, 
+                   omega_mean=omega_mean, omega_std=omega_std)
 
     def _sample_graph_unsupervised(self):
         n = random.randint(1, MAX_JOINTS)
@@ -54,6 +64,10 @@ class FakePendulumDataset(InMemoryDataset):
 
         x = []
         x_next = []
+        
+        # Calculate omega statistics (assuming mean=0, std=1 for this synthetic data)
+        omega_mean = 0.0
+        omega_std = 1.0
 
         for i in range(n):
             theta0 = random.uniform(-math.pi, math.pi)
@@ -61,8 +75,17 @@ class FakePendulumDataset(InMemoryDataset):
             theta1 = theta0 + omega0 * 0.1
             omega1 = omega0 - damping[i].item() * omega0 * 0.1
 
-            x.append(torch.tensor([theta0, omega0]))
-            x_next.append(torch.tensor([theta1, omega1]))
+            # Transform to sin/cos representation
+            sin_theta0 = math.sin(theta0)
+            cos_theta0 = math.cos(theta0)
+            omega0_normalized = omega0 / omega_std
+            
+            sin_theta1 = math.sin(theta1)
+            cos_theta1 = math.cos(theta1)
+            omega1_normalized = omega1 / omega_std
+
+            x.append(torch.tensor([sin_theta0, cos_theta0, omega0_normalized]))
+            x_next.append(torch.tensor([sin_theta1, cos_theta1, omega1_normalized]))
 
         x = torch.stack(x, dim=0)
         x_next = torch.stack(x_next, dim=0)
@@ -76,7 +99,8 @@ class FakePendulumDataset(InMemoryDataset):
                 [torch.stack([send, recv], dim=0),
                  torch.stack([recv, send], dim=0)], dim=1)
 
-        return Data(x=x, edge_index=edge_index, x_next=x_next)
+        return Data(x=x, edge_index=edge_index, x_next=x_next, 
+                   omega_mean=omega_mean, omega_std=omega_std)
     
 
 class MuJoCoPendulumDataset(InMemoryDataset):
@@ -127,6 +151,7 @@ class MuJoCoPendulumDataset(InMemoryDataset):
 
 
     def process(self):
+        print("Processing...")
         data_list = []
         
         # Adjusted to look for files in self.root if raw_paths is empty
@@ -139,6 +164,25 @@ class MuJoCoPendulumDataset(InMemoryDataset):
         if not json_file_paths:
             raise FileNotFoundError(f"No JSON files found matching pattern {self.json_files_pattern} in {self.root} or {self.raw_dir}")
 
+        # First pass: collect all omega values to calculate statistics
+        all_omegas = []
+        
+        for json_file_path in json_file_paths:
+            with open(json_file_path, 'r') as f:
+                sim_data = json.load(f)
+                
+            time_series = sim_data['time_series']
+            omegas = torch.tensor(time_series['omega'], dtype=torch.float32)
+            all_omegas.append(omegas)
+        
+        # Calculate mean and std of omega across all data
+        all_omegas_tensor = torch.cat(all_omegas)
+        omega_mean = all_omegas_tensor.mean().item()
+        omega_std = all_omegas_tensor.std().item()
+        
+        print(f"Omega statistics - Mean: {omega_mean:.4f}, Std: {omega_std:.4f}")
+        
+        # Second pass: process data with normalized omega
         for json_file_path in json_file_paths:
             with open(json_file_path, 'r') as f:
                 sim_data = json.load(f)
@@ -170,11 +214,25 @@ class MuJoCoPendulumDataset(InMemoryDataset):
             
             # Each step (t, t+1) is a sample
             for i in range(num_steps - 1):
-                x_t = torch.cat([thetas[i], omegas[i]], dim=0).unsqueeze(0) # Shape [1, 2] for 1 link
-                x_t_plus_1 = torch.cat([thetas[i+1], omegas[i+1]], dim=0).unsqueeze(0) # Shape [1, 2]
+                # Convert theta to sin/cos representation
+                sin_theta_t = torch.sin(thetas[i])
+                cos_theta_t = torch.cos(thetas[i])
                 
-                torque_t = torques_applied[i].unsqueeze(0) # For future use
-                alpha_t_true = alphas_true[i].unsqueeze(0) # For future use
+                # Normalize omega
+                omega_t_norm = (omegas[i] - omega_mean) / omega_std
+                
+                # Same for t+1
+                sin_theta_t_plus_1 = torch.sin(thetas[i+1])
+                cos_theta_t_plus_1 = torch.cos(thetas[i+1])
+                omega_t_plus_1_norm = (omegas[i+1] - omega_mean) / omega_std
+                
+                # Create feature vectors - shape [1, 3]
+                x_t = torch.tensor([[sin_theta_t, cos_theta_t, omega_t_norm]], dtype=torch.float32)
+                x_t_plus_1 = torch.tensor([[sin_theta_t_plus_1, cos_theta_t_plus_1, omega_t_plus_1_norm]], dtype=torch.float32)
+                
+                # Prepare other tensors with correct shapes
+                torque_t = torques_applied[i].reshape(1, 1)  # Shape [1, 1]
+                alpha_t_true = alphas_true[i].reshape(1, 1)  # Shape [1, 1]
 
                 graph_data = Data(
                     x=x_t,
@@ -183,18 +241,19 @@ class MuJoCoPendulumDataset(InMemoryDataset):
                     y_true_damping=true_damping_coeff, # Storing the physical damping
                     dt_step=dt_step,
                     # Store other potentially useful info
-                    true_torque_t = torque_t, 
-                    true_alpha_t = alpha_t_true,
-                    # true_mass = true_mass,
-                    true_length = true_length,
+                    true_torque_t=torque_t, 
+                    true_alpha_t=alpha_t_true,
+                    true_length=true_length,
                     inertia_yy=inertia_yy,
                     gravity_accel=gravity_accel,
                     true_mass=true_mass,
                     length_com_for_gravity=true_length,
                     mass=true_mass,
-
-                    file_origin=os.path.basename(json_file_path), # Add this
-                    step_index_in_file=i # Add this for more context
+                    # Store omega statistics for denormalization
+                    omega_mean=torch.tensor(omega_mean, dtype=torch.float32),
+                    omega_std=torch.tensor(omega_std, dtype=torch.float32),
+                    file_origin=os.path.basename(json_file_path),
+                    step_index_in_file=i
                 )
                 data_list.append(graph_data)
 
@@ -205,3 +264,4 @@ class MuJoCoPendulumDataset(InMemoryDataset):
 
         data, slices = self.collate(data_list)
         torch.save((data, slices), self.processed_paths[0])
+        print("Done!")
