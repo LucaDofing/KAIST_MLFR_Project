@@ -40,7 +40,11 @@ except ImportError:
             "x_axis": "1.0 0.0 0.0 1",
             "y_axis": "0.0 1.0 0.0 1",
             "z_axis": "0.0 0.0 1.0 1"
-        }
+        },
+        "camera_pos": (0.0, -0.8, 0.6),
+        "camera_xyaxes": "1 0 0 0 0.8 0.6",
+        "camera_target": "body0",
+        "camera_mode": "trackcom"
     }
 
 def get_xml_models_dir():
@@ -88,7 +92,6 @@ def create_n_link_robot_xml(**kwargs):
     timestep = params["timestep"]
     integrator = params["integrator"]
     gravity = params["gravity"]
-    target_pos = params["target_pos"]
     colors = params["colors"]
 
     # Calculate fingertip mass if not specified
@@ -182,10 +185,16 @@ def create_n_link_robot_xml(**kwargs):
                  rgba=colors["z_axis"])
     
     # Add camera
+    camera_pos = kwargs.get("camera_pos", (0.0, -1.0, 0.8))
+    camera_xyaxes = kwargs.get("camera_xyaxes", "1 0 0 0 0.8 0.6")
+    camera_target = kwargs.get("camera_target", "body0")
+    camera_mode = kwargs.get("camera_mode", "trackcom")
+    
     ET.SubElement(worldbody, "camera", 
-                 name="track", mode="trackcom", 
-                 pos="0.3 -0.3 0.3", xyaxes="1 0 0 0 1 1",
-                 target="body0")
+                 name="track", mode=camera_mode, 
+                 pos=f"{camera_pos[0]} {camera_pos[1]} {camera_pos[2]}", 
+                 xyaxes=camera_xyaxes,
+                 target=camera_target)
     
     # Add light
     ET.SubElement(worldbody, "light",
@@ -256,13 +265,6 @@ def create_n_link_robot_xml(**kwargs):
             # Otherwise, create the next body for the next link
             next_body = ET.SubElement(prev_body, "body", name=f"body{i+1}", pos=f"0 0 {link_length}")
             prev_body = next_body
-    
-    # Add fixed target at a different position
-    ET.SubElement(worldbody, "geom", 
-                 conaffinity="0", contype="0", name="target", 
-                 pos=f"0.15 0.0 0.15", 
-                 rgba=colors["target"], 
-                 size=".009", type="sphere")
     
     # Convert to string with pretty printing
     xmlstr = minidom.parseString(ET.tostring(root)).toprettyxml(indent="\t")
@@ -338,6 +340,18 @@ Examples:
     parser.add_argument("--output_name", type=str, default=DEFAULT_PARAMS["output_name"],
                        help=f"Filename for the XML file (default: {DEFAULT_PARAMS['output_name']})")
     
+    # Camera Parameters
+    parser.add_argument("--camera_pos", type=float, nargs=3, default=DEFAULT_PARAMS["camera_pos"],
+                       metavar=('X', 'Y', 'Z'),
+                       help=f"Camera position (x y z) (default: {DEFAULT_PARAMS['camera_pos']})")
+    parser.add_argument("--camera_xyaxes", type=str, default=DEFAULT_PARAMS["camera_xyaxes"],
+                       help=f"Camera orientation axes (default: {DEFAULT_PARAMS['camera_xyaxes']})")
+    parser.add_argument("--camera_target", type=str, default=DEFAULT_PARAMS["camera_target"],
+                       help=f"Camera target body (default: {DEFAULT_PARAMS['camera_target']})")
+    parser.add_argument("--camera_mode", type=str, default=DEFAULT_PARAMS["camera_mode"],
+                       choices=["trackcom", "fixed", "track"],
+                       help=f"Camera tracking mode (default: {DEFAULT_PARAMS['camera_mode']})")
+    
     # Special options
     parser.add_argument("--show_config", action="store_true",
                        help="Show current default configuration and exit")
@@ -373,6 +387,10 @@ Examples:
         "timestep": args.timestep,
         "integrator": args.integrator,
         "gravity": tuple(args.gravity),
+        "camera_pos": tuple(args.camera_pos),
+        "camera_xyaxes": args.camera_xyaxes,
+        "camera_target": args.camera_target,
+        "camera_mode": args.camera_mode
     }
     
     # Generate XML using parameters

@@ -59,7 +59,7 @@ def init_visualization():
     context = mujoco.MjrContext(model, mujoco.mjtFontScale.mjFONTSCALE_150.value)
     
     # Set camera viewpoint
-    cam.distance = 1.5
+    cam.distance = 4
     cam.elevation = 0
     cam.azimuth = 90
     cam.lookat[0] = 0.0  # x
@@ -107,7 +107,7 @@ def run_simulation_with_rendering(model, data, controller, logger, args):
         # Render if it's time
         if current_time >= next_render_time:
             # Update visualization
-            viewport = mujoco.MjrRect(0, 0, 1200, 900)
+            viewport = mujoco.MjrRect(0, 0, 1980, 1980)
             mujoco.mjv_updateScene(model, data, opt, None, cam,
                                   mujoco.mjtCatBit.mjCAT_ALL.value, scene)
             mujoco.mjr_render(viewport, scene, context)
