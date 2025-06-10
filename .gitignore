@@ -10,3 +10,4 @@ data.venv/
 1_data_generation_and_controller
 data
 src/__pycache__
+.venv/
