@@ -233,70 +233,95 @@ The angular acceleration $\alpha_t$ is calculated from this equation. The next s
 
 All hyperparameters are managed in `src/config.py`.
 
+Of course. These plots tell a very clear and interesting story. The model is an excellent predictor but a poor parameter identifier, which is a fantastic result to analyze.
+
+Here are the "Results" and "Discussion" sections of your report, filled out with a detailed interpretation of your plots.
+
 ### 3.3 Experiments and Results
 
-*(This section should be filled with your latest results. The structure below is based on your final code.)*
-
-The GNN model was trained and evaluated on datasets derived from MuJoCo simulations of a 1-link pendulum.
+The GNN model was trained and evaluated on datasets derived from MuJoCo simulations of a 1-link pendulum. The key objective was to minimize the next-state prediction error and observe if this process led to the identification of the true physical damping coefficient.
 
 #### 3.3.1 Experimental Setup
--   **Datasets:** Trajectories were generated using various conditions. The final training used JSON files located in `data/mujoco/`.
--   **Data Split:** The combined dataset was split into training and testing sets with an 80/20 ratio.
--   **Training:** The model was trained using the parameters specified in Section 3.2.4.
+-   **Datasets:** Trajectories were generated using a 1-link pendulum model with a fixed true physical damping coefficient `b_true = 0.7 Nms/rad`.
+-   **Data Split:** The combined dataset, consisting of 2,994 time-step transitions, was split into a training set (2,395 samples) and a testing set (599 samples) using an 80/20 ratio.
+-   **Training:** The model was trained for 50 epochs using the parameters and training procedure described in Section 3.2.4.
 
 #### 3.3.2 Next-State Prediction Performance
-The primary metric for training is the MSE loss for next-state prediction.
 
-**(Please insert your MSE loss curves here - e.g., a plot showing training and testing MSE vs. epochs.)**
+The model's primary task was to accurately predict the pendulum's state (`θ`, `ω`) at the next time step. The performance in this task was excellent.
 
-*Figure 3.1: Training and Testing MSE Loss for Next-State Prediction.*
+Figure 3.1 shows the training and validation loss curves over 50 epochs. Both losses decrease smoothly and converge quickly, plateauing after approximately 30 epochs. The final validation MSE loss of **~1.59 x 10⁻²** is extremely close to the training loss, indicating that the model generalizes well to unseen data without overfitting.
 
-The MSE loss on the training set decreased to approximately **[Your Final Training MSE]** and on the test set to approximately **[Your Final Test MSE]**. The decreasing loss indicates that the model is successfully learning to predict the system's evolution.
+<div align="center">
+<table>
+<tr>
+<td align="center"><img src="Figures/loss_curve.png" width="1500"><br><b>XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX</b></td>
+</tr>
+</table>
+</div>
+*Figure 3.1: Training and Validation MSE Loss vs. Epochs. The model shows smooth convergence with no signs of overfitting.*
+
+This high predictive accuracy is further confirmed by the scatter plots in Figure 3.2. For both the next angle (`θ_t+1`) and the next angular velocity (`ω_t+1`), the predicted values are tightly clustered around the `y=x` line, which represents a perfect prediction. This demonstrates that the model learned the system's dynamics with high fidelity.
+
+<div align="center">
+<table>
+<tr>
+<td align="center"><img src="Figures/prediction_scatter.png" width="1500"><br><b>XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX</b></td>
+</tr>
+</table>
+</div>
+*Figure 3.2: Predicted vs. True Next-State Values on the Test Set. The tight correlation to the y=x line indicates high prediction accuracy for both angle and angular velocity.*
 
 #### 3.3.3 Damping Coefficient Estimation
-The core goal was to see if the GNN could infer the true physical damping coefficient $b_{true}$ by minimizing the next-state prediction error.
 
-*Example Output from `main.py` after training:*
-```
-Sample prediction (unsupervised):
-Current state θ, ω:
-[[...]]
-Predicted next state θ_next, ω_next:
-[[...]]
-True next state θ_next, ω_next (from MuJoCo):
-[[...]]
-Estimated damping per joint (from GNN):
-[Your Estimated b_coeff]
-True physical damping per joint (from JSON):
-[Value of b_true from your JSON file]
-  (using mass: ..., length_com_for_gravity: ..., inertia_yy: ..., dt: ..., gravity_accel: ...)
-```
+While the model excelled at prediction, its ability to identify the underlying physical damping coefficient was poor. The core goal was to see if the GNN would infer the true value of `b_true = 0.7` simply by minimizing prediction error.
 
-**Observations on Damping Estimation:**
-- The GNN-estimated damping coefficient $\hat{b}$ **[Describe your final observation: e.g., "converged to a value of X, which shows a discrepancy from the true physical damping $b_{true}$", or "was consistently around Y"].**
-- This discrepancy suggests that the GNN is learning an "effective" damping coefficient that compensates for systemic differences between our semi-implicit Euler integrator and MuJoCo's more complex implicit integrator.
+Figure 3.3 shows the distribution of the estimated damping coefficient `b` across all samples in the test set. The results are striking:
+-   The GNN did **not** learn to output a value near the true `b` of 0.7.
+-   Instead, the model's estimates are **bimodal**, clustered at the extremes of a `[0, 1]` range, with large peaks near `b=0.0` and `b=1.0`.
+-   The calculated mean of the estimated `b` is **0.57**, but this value is misleading as very few predictions actually fall near the mean. It is simply an average of the two extreme clusters.
+
+<div align="center">
+<table>
+<tr>
+<td align="center"><img src="Figures/damping_distribution.png" width="1500"><br><b>XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX</b></td>
+</tr>
+</table>
+</div>
+*Figure 3.3: Distribution of the GNN-Estimated Damping Coefficient "b" on the Test Set. Instead of converging to the true value (0.7), the model learned a bimodal distribution, pushing estimates to the extremes.*
+
+This result demonstrates that the model did not identify the physical parameter. Instead, it learned to use the damping coefficient as an "effective" parameter, essentially a binary switch: for a given state, it applies either maximum damping (by outputting a value near 1.0) or minimum damping (by outputting a value near 0.0) to best match the next state in its internal physics simulation.
 
 ### 3.4 Discussion of GNN Module
 
 #### 3.4.1 Effectiveness for System Identification
-The GNN-based approach demonstrates the potential for learning system dynamics in an unsupervised manner. By tasking the model with predicting the next state, it is forced to learn an internal representation that captures some aspects of the underlying physics. However, the results indicate that when the differentiable physics model is an approximation of the true system, the GNN learns "effective" parameters optimal for its own internal model, which may not match the true physical values.
+
+The experiments reveal a critical insight into this unsupervised system identification approach: **a model that is highly effective at predicting system dynamics is not necessarily effective at identifying the true physical parameters.**
+
+The GNN successfully minimized its objective function (MSE loss), leading to excellent next-state predictions. However, it achieved this by finding a "shortcut" rather than learning the ground-truth physics. The bimodal distribution of the estimated damping `b` shows that the model learned to treat the parameter as a powerful, non-physical switch to correct for errors in its own internal, simplified physics model. This highlights a fundamental challenge of identifiability: multiple parameter settings (in this case, a state-dependent switching between 0.0 and 1.0) can produce prediction results that are just as good as, or even better than, using the single true physical value.
 
 #### 3.4.2 Impact of Data and Model Fidelity
--   **Physics Model Accuracy:** The accuracy of the `simulate_step_physical` function is paramount. While it includes key physical terms (mass, inertia, gravity), the discrepancy due to the choice of integrator (semi-implicit Euler vs. MuJoCo's implicit solver) remains a significant factor, likely forcing the GNN to learn compensatory parameter values.
--   **Input Feature Representation:** The model uses the raw angle $\theta$ as an input. This is challenging for neural networks due to the angle's periodicity (e.g., $0$ and $2\pi$ are the same state but have different numerical values). This could hinder learning performance compared to using `sin(θ)` and `cos(θ)`.
--   **Loss Scaling:** The MSE loss is unweighted. Since angular velocities ($\omega$) often have a much larger numerical range than angles ($\theta$), the loss value and the resulting gradients may be dominated by errors in predicting $\omega$. This could lead to a model that is very good at predicting velocity but less accurate at predicting the next angular position.
 
-#### 3.4.3 Challenges and Limitations
--   **Parameter Identifiability:** Estimating a single parameter like damping ($b$) is difficult when it interacts with many other known (but potentially imperfectly specified) parameters and unmodeled dynamics (e.g., friction, integrator differences).
--   **Integrator Discrepancy:** The difference between our simple Euler integrator and MuJoCo's implicit solver is a significant source of systematic error that the GNN attempts to compensate for by adjusting $\hat{b}$.
+-   **Integrator Discrepancy:** This is the most likely cause of the observed behavior. Our training loop uses a simple semi-implicit Euler integrator. The MuJoCo simulation environment, where the data was generated, uses a much more sophisticated and accurate implicit solver. The GNN is forced to compensate for this systemic **model mismatch**. By learning to output an extreme damping value, the GNN gains a powerful tool to "nudge" its simplified simulation to match the more complex MuJoCo-generated ground truth. It effectively learns to correct the integrator's error.
+
+-   **Parameter Identifiability:** The GNN's output `b` is just one of many parameters in the `simulate_step_physical` function. The model discovered that aggressively modulating this single parameter was a highly effective strategy for controlling the simulation's outcome, without needing to be physically accurate.
+
+-   **Loss Function and Input Features:** While using raw `θ` as input and an unweighted MSE loss are not ideal, the excellent prediction accuracy suggests they were not the primary bottlenecks. The model was powerful enough to succeed at its prediction task despite these limitations. The core issue lies in the discrepancy between the training simulator and the data-generating simulator.
 
 ### 3.5 Future Work and Potential Improvements for GNN Module
 
--   **More Sophisticated Differentiable Simulator:** Implementing a more accurate differentiable integrator (e.g., Runge-Kutta 4) could reduce the model mismatch and lead to more accurate physical parameter estimation.
--   **Input Feature Engineering:** A key improvement would be to provide the GNN with engineered features that respect the physics, such as using `sin(θ)` and `cos(θ)` instead of raw `θ` to handle periodicity. Additionally, normalizing input features (especially `ω`) could improve training stability.
--   **Weighted Loss Function:** Introduce separate weights for the MSE loss components of angle and angular velocity to balance their contributions, preventing the loss from being dominated by velocity errors.
--   **Handling Multi-Link Systems:** Extending this to N-link robots where GNNs can truly leverage graph convolutions across multiple connected joints is a key next step. This would involve correctly defining edge features and ensuring the differentiable physics model can handle multi-body dynamics.
--   **Multi-Parameter Estimation:** Extend the GNN to estimate multiple parameters simultaneously (e.g., $m, I_{yy}, b$), which would require careful consideration of their identifiability.
+Based on the results, the following steps could lead to more accurate physical parameter identification:
 
-### References
-[^1]: Kipf, T. N., & Welling, M. (2017). Semi-supervised classification with graph convolutional networks. In International conference on learning representations (ICLR).
+-   **Improve the Differentiable Simulator:** The highest-priority improvement is to implement a more accurate differentiable integrator (e.g., Runge-Kutta 4) in the `simulate_step_physical` function. This would reduce the model mismatch, making it harder for the GNN to "cheat" and forcing it to find more physically plausible parameter values.
+
+-   **Regularize the GNN Output:** To prevent the bimodal "switching" behavior, a regularization term could be added to the loss function. For example, a term that penalizes variance or encourages the output to be close to an expected value could force the GNN to converge to a single, more stable estimate.
+    ```python
+    # Example loss
+    prediction_loss = F.mse_loss(pred_next, true_next)
+    variance_penalty = torch.var(estimated_b)
+    loss = prediction_loss + lambda * variance_penalty
+    ```
+
+-   **Constrain the Output Activation:** The current model uses a ReLU output, allowing `b` to be any non-negative value. The learned distribution suggests the model is saturating near 1.0. Replacing the final activation with a scaled `Sigmoid` function could constrain the output to a more physically plausible range (e.g., `[0, 2]`) and encourage a less extreme output distribution.
+
+-   **Simultaneous Multi-Parameter Estimation:** A more advanced goal would be to have the GNN estimate multiple parameters at once (e.g., mass, inertia, and damping). This would be significantly more challenging but would better test the GNN's ability to disentangle the effects of different physical properties.
