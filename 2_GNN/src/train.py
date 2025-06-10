@@ -1,94 +1,9 @@
 # src/train.py
 
 import torch
-import torch.nn as nn
-import torch.optim as optim
-from src.config import NUM_EPOCHS, LEARNING_RATE, WEIGHT_DECAY
 import torch.nn.functional as F
 
-
-def simulate_step(x, estimated_damping, dt): # dt is now an argument
-    theta, omega = x[:, 0], x[:, 1]
-    
-    # Ensure estimated_damping has the correct shape for broadcasting if x is batched
-    # x shape: [num_nodes_in_batch, 2]
-    # estimated_damping shape: [num_nodes_in_batch, 1]
-    damping = estimated_damping.squeeze(-1) # Squeeze the last dim: [N]
-
-    # Simplified physics model (same as your FakePendulumDataset's implicit assumption)
-    # omega_next = omega - damping * omega * dt # Explicit Euler for omega
-    # theta_next = theta + omega * dt           # Explicit Euler for theta
-
-    # OR, the model from your current train.py (semi-implicit Euler for theta)
-    domega_dt = -damping * omega # This is an angular acceleration if I=1
-    omega_next = omega + domega_dt * dt
-    theta_next = theta + omega_next * dt # Uses updated omega
-
-    return torch.stack([theta_next, omega_next], dim=1)
-
-
-def run_training(model, train_loader, test_loader, device, epochs=200, lr=1e-2, weight_decay=1e-5):
-    """Run training with improved learning rate and monitoring"""
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode='min', factor=0.5, patience=10, verbose=True
-    )
-    
-    best_test_loss = float('inf')
-    patience = 20
-    patience_counter = 0
-    
-    print("Starting training...")
-    for epoch in range(1, epochs + 1):
-        # Training
-        model.train()
-        train_loss = 0.0
-        train_count = 0
-        
-        for data in train_loader:
-            data = data.to(device)
-            loss = train_step(model, optimizer, data)
-            train_loss += loss * data.num_nodes
-            train_count += data.num_nodes
-        
-        # Average training loss
-        train_loss = train_loss / train_count
-        
-        # Validation
-        model.eval()
-        test_loss = 0.0
-        test_count = 0
-        
-        for data in test_loader:
-            data = data.to(device)
-            loss = validate_step(model, data)
-            test_loss += loss * data.num_nodes
-            test_count += data.num_nodes
-        
-        # Average test loss
-        test_loss = test_loss / test_count
-        
-        # Update learning rate
-        scheduler.step(test_loss)
-        
-        # Early stopping
-        if test_loss < best_test_loss:
-            best_test_loss = test_loss
-            patience_counter = 0
-        else:
-            patience_counter += 1
-            
-        if patience_counter >= patience:
-            print(f"Early stopping at epoch {epoch}")
-            break
-        
-        # Print metrics
-        if epoch % 5 == 0 or epoch == 1:
-            print(f"Epoch {epoch:3d} | Train Loss: {train_loss:.4f} | Test Loss: {test_loss:.4f}")
-    
-    print("Training done.")
-
-
+# This function is now defined here and used by train_step/validate_step
 def simulate_step_physical(x, applied_torque, estimated_b, dt, mass, length_com_for_gravity, inertia_yy, gravity_accel):
     theta, omega = x[:, 0], x[:, 1]
     b_estimated = estimated_b.squeeze(-1)
@@ -96,20 +11,15 @@ def simulate_step_physical(x, applied_torque, estimated_b, dt, mass, length_com_
     length_com_sq = length_com_for_gravity.squeeze(-1)
     inertia_yy_sq = inertia_yy.squeeze(-1)
     applied_torque_sq = applied_torque.squeeze(-1)
-    g = gravity_accel.squeeze(-1) # Should be scalar or same dim as others
+    g = gravity_accel.squeeze(-1)
 
-    # Torque due to gravity
-    # Assuming theta is angle from horizontal X-axis, for a Y-axis hinge, gravity in -Z
-    # Torque_gravity_about_Y = CoM_x_world * Force_z_world
-    # CoM_x_world = length_com_sq * cos(theta)
-    # Force_z_world = -mass_sq * g
-    # torque_gravity = length_com_sq * torch.cos(theta) * (-mass_sq * g) # This seems to be the standard
-    # Let's re-verify standard pendulum equation: I * alpha = -m*g*L*sin(theta_from_vertical) - b*omega
-    # If your theta is angle from horizontal X-axis:
-    # sin(theta_from_vertical) = cos(theta_from_horizontal)
-    # So, torque_gravity = -mass_sq * g * length_com_sq * torch.cos(theta) # if theta is from horizontal
-    # OR, if theta is from vertical:
-    torque_gravity = -mass_sq * g * length_com_sq * torch.sin(theta) # if theta is from vertical
+    # Standard pendulum equation: I * alpha = Sum of Torques
+    # Torque due to gravity: -m*g*L*sin(theta) (assuming theta=0 is vertically down)
+    # The JSON data likely has theta=0 as horizontal, so we use sin(theta) if gravity is in Y,
+    # or cos(theta) if gravity is in Z. Let's stick with the provided formula.
+    # IMPORTANT: Your JSON has gravity in Z = -9.81. If theta is from the vertical, use sin.
+    # If theta is from the horizontal, use cos. The code uses sin, assuming theta from vertical.
+    torque_gravity = -mass_sq * g * length_com_sq * torch.sin(theta)
 
     torque_damping = -b_estimated * omega
     
@@ -117,36 +27,34 @@ def simulate_step_physical(x, applied_torque, estimated_b, dt, mass, length_com_
     
     alpha = net_torque / inertia_yy_sq
 
+    # Semi-implicit Euler integration
     omega_next = omega + alpha * dt
     theta_next = theta + omega_next * dt 
 
     return torch.stack([theta_next, omega_next], dim=1)
-
-# ... run_training function (update the call to simulate_step_physical) ...
-# Inside run_epoch:
-# pred_next = simulate_step_physical(
-#     x=data.x,
-#     applied_torque=data.applied_torque_t,
-#     estimated_b=estimated_b_coeff, # GNN now predicts 'b'
-#     dt=current_dt,
-#     mass=data.mass,
-#     length_com_for_gravity=data.length_com_for_gravity,
-#     inertia_yy=data.inertia_yy,
-#     gravity_accel=data.gravity_accel # Pass gravity
-# )
 
 def train_step(model, optimizer, data):
     """Single training step"""
     model.train()
     optimizer.zero_grad()
     
-    # Get damping prediction
+    # Get damping prediction from the model
     damping = model(data)
     
-    # Compute next state using full physics simulation
-    next_state = model.compute_next_state(data, damping)
+    # --- CORRECTED: Call simulate_step_physical directly ---
+    # This removes the need for a custom `compute_next_state` method in the model
+    next_state = simulate_step_physical(
+        x=data.x,
+        applied_torque=data.true_torque_t,
+        estimated_b=damping,
+        dt=data.dt_step,
+        mass=data.mass,
+        length_com_for_gravity=data.length_com_for_gravity,
+        inertia_yy=data.inertia_yy,
+        gravity_accel=data.gravity_accel
+    )
     
-    # Only use state prediction loss
+    # Calculate loss against the true next state from the dataset
     loss = F.mse_loss(next_state, data.x_next)
     
     # Backward pass
@@ -167,10 +75,88 @@ def validate_step(model, data):
         # Get damping prediction
         damping = model(data)
         
-        # Compute next state using full physics simulation
-        next_state = model.compute_next_state(data, damping)
+        # --- CORRECTED: Call simulate_step_physical directly ---
+        next_state = simulate_step_physical(
+            x=data.x,
+            applied_torque=data.true_torque_t,
+            estimated_b=damping,
+            dt=data.dt_step,
+            mass=data.mass,
+            length_com_for_gravity=data.length_com_for_gravity,
+            inertia_yy=data.inertia_yy,
+            gravity_accel=data.gravity_accel
+        )
         
-        # Only use state prediction loss
+        # Calculate loss
         loss = F.mse_loss(next_state, data.x_next)
     
     return loss.item()
+
+def run_training(model, train_loader, test_loader, device, epochs=200, lr=1e-2, weight_decay=1e-5):
+    """Run training with improved learning rate and monitoring"""
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode='min', factor=0.5, patience=10, verbose=True
+    )
+    
+    best_test_loss = float('inf')
+    patience = 20
+    patience_counter = 0
+
+    train_losses, test_losses = [], []
+    
+    print("Starting training...")
+    for epoch in range(1, epochs + 1):
+        # Training
+        model.train()
+        train_loss_total = 0.0
+        train_count = 0
+        
+        for data in train_loader:
+            data = data.to(device)
+            # The number of graphs in a batch is data.num_graphs
+            # The number of nodes is data.num_nodes
+            loss = train_step(model, optimizer, data)
+            train_loss_total += loss * data.num_graphs
+            train_count += data.num_graphs
+        
+        # Average training loss per graph
+        avg_train_loss = train_loss_total / train_count
+        train_losses.append(avg_train_loss)
+        
+        # Validation
+        model.eval()
+        test_loss_total = 0.0
+        test_count = 0
+        
+        with torch.no_grad():
+            for data in test_loader:
+                data = data.to(device)
+                loss = validate_step(model, data)
+                test_loss_total += loss * data.num_graphs
+                test_count += data.num_graphs
+        
+        # Average test loss per graph
+        avg_test_loss = test_loss_total / test_count
+        test_losses.append(avg_test_loss)
+        
+        # Update learning rate
+        scheduler.step(avg_test_loss)
+        
+        # Early stopping
+        if avg_test_loss < best_test_loss:
+            best_test_loss = avg_test_loss
+            patience_counter = 0
+        else:
+            patience_counter += 1
+            
+        if patience_counter >= patience:
+            print(f"Early stopping at epoch {epoch}")
+            break
+        
+        # Print metrics
+        if epoch % 5 == 0 or epoch == 1:
+            print(f"Epoch {epoch:3d} | Train Loss: {avg_train_loss:.6f} | Test Loss: {avg_test_loss:.6f}")
+    
+    print("Training done.")
+    return train_losses, test_losses
