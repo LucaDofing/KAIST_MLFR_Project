@@ -1,0 +1,93 @@
+{
+    "robot_name": "robot_L1_len0.40_rad0.075_mass7.0_ftip0.500_damp0.70_torq20.0",
+    "creation_time": "2025-06-09 23:42:16",
+    "total_trajectories": 6,
+    "robot_parameters": {
+        "num_links": 1,
+        "mass": 7.0,
+        "fingertip_mass": 0.5,
+        "length": 0.4,
+        "radius": 0.075,
+        "damping": 0.7,
+        "inertia": 0.5185666666666666,
+        "torque_limit_nm": 20.0
+    },
+    "simulation_parameters": {
+        "dt": 0.01,
+        "gravity": [
+            0.0,
+            0.0,
+            -9.81
+        ],
+        "solver": "Implicit"
+    },
+    "trajectory_list": [
+        {
+            "initial_angle_deg": 0.0,
+            "target_angle_deg": 45.0,
+            "controller_gains": {
+                "kp": 50.0,
+                "kd": 1.0,
+                "ki": 0.0
+            },
+            "num_steps": 1001,
+            "simulation_time": 0.04176521301269531
+        },
+        {
+            "initial_angle_deg": 0.0,
+            "target_angle_deg": 90.0,
+            "controller_gains": {
+                "kp": 50.0,
+                "kd": 1.0,
+                "ki": 0.0
+            },
+            "num_steps": 1001,
+            "simulation_time": 0.04304862022399902
+        },
+        {
+            "initial_angle_deg": 29.999999999999996,
+            "target_angle_deg": 45.0,
+            "controller_gains": {
+                "kp": 50.0,
+                "kd": 1.0,
+                "ki": 0.0
+            },
+            "num_steps": 1001,
+            "simulation_time": 0.03716874122619629
+        },
+        {
+            "initial_angle_deg": 29.999999999999996,
+            "target_angle_deg": 90.0,
+            "controller_gains": {
+                "kp": 50.0,
+                "kd": 1.0,
+                "ki": 0.0
+            },
+            "num_steps": 1001,
+            "simulation_time": 0.03678250312805176
+        },
+        {
+            "initial_angle_deg": 59.99999999999999,
+            "target_angle_deg": 45.0,
+            "controller_gains": {
+                "kp": 50.0,
+                "kd": 1.0,
+                "ki": 0.0
+            },
+            "num_steps": 1001,
+            "simulation_time": 0.03680896759033203
+        },
+        {
+            "initial_angle_deg": 59.99999999999999,
+            "target_angle_deg": 90.0,
+            "controller_gains": {
+                "kp": 50.0,
+                "kd": 1.0,
+                "ki": 0.0
+            },
+            "num_steps": 1001,
+            "simulation_time": 0.03748273849487305
+        }
+    ],
+    "last_updated": "2025-06-09 23:46:44"
+}

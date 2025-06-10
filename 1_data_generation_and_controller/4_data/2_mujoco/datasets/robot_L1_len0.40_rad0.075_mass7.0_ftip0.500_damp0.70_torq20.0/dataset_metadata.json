@@ -1,0 +1,50 @@
+{
+    "robot_model": {
+        "n_links": 1,
+        "link_length": 0.4,
+        "link_radius": 0.075,
+        "link_mass": 7.0,
+        "fingertip_mass": 0.5,
+        "joint_damping": 0.7,
+        "torque_limit": 20.0
+    },
+    "simulation_parameters": {
+        "control_mode": [
+            "pd"
+        ],
+        "initial_angle": [
+            0.0,
+            30.0,
+            60.0
+        ],
+        "target_angle": [
+            45.0,
+            90.0
+        ],
+        "kp": [
+            10.0,
+            20.0,
+            30.0,
+            40.0,
+            50.0
+        ],
+        "kd": [
+            0.01,
+            0.05,
+            0.1,
+            0.2,
+            0.5,
+            1.0
+        ],
+        "sim_time": [
+            4.0,
+            6.0,
+            8.0,
+            10.0
+        ]
+    },
+    "total_simulations": 0,
+    "successful_simulations": 0,
+    "dataset_folder": "/home/luca/Documents/KAIST/MLFR/00_Project/1_data_generation_and_controller/4_data/2_mujoco/datasets/robot_L1_len0.40_rad0.075_mass7.0_ftip0.500_damp0.70_torq20.0",
+    "results": []
+}
