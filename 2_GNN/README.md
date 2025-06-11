@@ -9,18 +9,18 @@ This project implements a Graph Convolutional Network (GCN) for predicting joint
 ```
 KAIST_MLFR_Project/2_GNN/
 │
-├── main.py                         # 🎯 Main training and inference pipeline
+├── main.py                         # Main training and inference pipeline
 ├── requirements.txt                # Python dependencies
 ├── Notes                          # Design notes and future improvements
 │
-├── src/                           # 📦 Core implementation modules
+├── src/                           # Core implementation modules
 │   ├── __init__.py               
 │   ├── config.py                  # Configuration parameters
 │   ├── datasets.py                # PyTorch Geometric dataset classes
 │   ├── models.py                  # GNN model architectures
 │   └── train.py                   # Training and physics simulation functions
 │
-├── data/                          # 📊 Dataset storage
+├── data/                          # Dataset storage
 │   └── mujoco/                    # MuJoCo trajectory data
 │       ├── raw/                   # Raw JSON files from simulation
 │       └── processed/             # Processed .pt graph data files
@@ -68,7 +68,7 @@ Place your MuJoCo JSON trajectory files in the `data/mujoco/` directory:
 
 
 
-**⚠️ Important: Delete Processed Files for New Data**
+**Important: Delete Processed Files for New Data**
 When adding new JSON files, you MUST delete the processed `.pt` files:
 ```bash
 rm -rf data/mujoco/processed/*.pt
