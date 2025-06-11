@@ -193,16 +193,16 @@ The GNN model, `DampingGCN`, is designed to predict the damping coefficient $\ha
 
 -   **Input Features:** The model uses the raw kinematic state as direct input. The input features for each node are simply its angle and angular velocity: $[\theta_t, \omega_t]$. Therefore, the model's `INPUT_DIM` is **2**, as defined in `src/config.py`.
 -   **Graph Convolutional Layers:** The model uses `NUM_LAYERS = 3` GCN layers (`torch_geometric.nn.GCNConv`) with `HIDDEN_DIM = 64` hidden units.
--   **Activation Functions:** ReLU activation (`torch.relu`) is applied after the intermediate GCN layers.
--   **Output Layer:** A linear layer (`torch.nn.Linear(HIDDEN_DIM, 1)`) maps the final hidden representation to a single scalar, the estimated damping coefficient $\hat{b}$. A final ReLU activation is applied to this output to ensure the physical constraint $\hat{b} \ge 0$.
+-   **Activation Functions:** Sigmoid activation (`torch.sigmoid`) is applied after the intermediate GCN layers.
+-   **Output Layer:** A linear layer (`torch.nn.Linear(HIDDEN_DIM, 1)`) maps the final hidden representation to a single scalar, the estimated damping coefficient $\hat{b}$. A final Sigmoid activation is applied to this output to ensure the physical constraint $\hat{b} \ge 0$.
 -   **Operation for 1-Link System:** For the 1-link pendulum, each graph has only one node and no edges. In this case, the GCN layers effectively operate as a standard Multi-Layer Perceptron (MLP) on the node features.
 
 The model architecture can be summarized as:
 $h_0 = [\theta_t, \omega_t]$
-$h_1 = \text{ReLU}(\text{MLP}_1(h_0))$
-$h_2 = \text{ReLU}(\text{MLP}_2(h_1))$
+$h_1 = \text{Sigmoid}(\text{MLP}_1(h_0))$
+$h_2 = \text{Sigmoid}(\text{MLP}_2(h_1))$
 $h_3 = \text{MLP}_3(h_2)$
-$\hat{b} = \text{ReLU}(\text{Linear}(h_3))$
+$\hat{b} = \text{Sigmoid}(\text{Linear}(h_3))$
 
 #### 3.2.4 Training Pipeline (`src/train.py`)
 
@@ -361,11 +361,11 @@ This category assumes that some model mismatch will always exist. These techniqu
 *   **Expected Outcome:** The learned distribution of `b` should become unimodal and more tightly clustered, even if the mean is still slightly off due to model mismatch.
 
 #### **Idea 2.2: Constrain the GNN's Output Activation**
-*   **Problem:** The current ReLU output is unbounded, and the model learned to saturate near the extremes of its observed range (`[0, 1]`).
-*   **Solution:** Replace the final activation function with one that enforces a physically plausible range.
-    *   **Scaled Sigmoid Function:** `output = min_val + (max_val - min_val) * torch.sigmoid(linear_output)`. For example, if one knows the damping `b` should be between 0 and 2, one can enforce this.
-    *   **Softplus or Tanh:** These can also provide smooth, bounded, or one-sided outputs that might lead to more stable training than an unbounded ReLU.
-*   **Expected Outcome:** This prevents the GNN from predicting wildly unrealistic parameter values and can stabilize the optimization landscape.
+
+*   **Problem:** The current Sigmoid output is bounded between `[0, 1]`, but the model learned to saturate near the extremes of this range, which may not align with the physical constraints of the damping coefficient.
+*   **Solution:** Replace the Sigmoid activation with a **Softplus** function. The Softplus activation (`torch.nn.functional.softplus`) ensures the output is strictly positive, which aligns with the physical constraint that damping coefficients cannot be negative. Additionally, Softplus avoids hard saturation at the upper bound, allowing for smoother gradients and potentially better optimization dynamics.
+    *   **Softplus Formula:** `output = log(1 + exp(linear_output))`. This ensures the output is always greater than zero but does not impose an upper limit.
+*   **Expected Outcome:** The Softplus activation provides a more flexible and physically plausible range for the damping coefficient, reducing the likelihood of extreme saturation and improving the model's ability to learn meaningful values.
 
 ### **C: Improving the Experimental Design and Data**
 
