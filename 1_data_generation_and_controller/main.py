@@ -1,39 +1,100 @@
+#!/usr/bin/env python3
+"""
+Dataset Generation Automation for N-Link Robot Simulation
+
+This script automates the generation of large datasets by:
+1. Loading robot model parameters from sweep_config.py
+2. Automatically generating XML models using robot specifications
+3. Running parameter sweeps across different simulation conditions
+4. Organizing data into structured directories
+5. Generating comprehensive datasets for machine learning applications
+
+Author: KAIST MLFR Project
+"""
+
 import os
+import sys
 import json
+import logging
 import itertools
 import subprocess
 import argparse
-from typing import Dict, List, Any, Union
+from pathlib import Path
+from typing import Dict, List, Any, Union, Optional, Tuple
 import numpy as np
-from sweep_config import robot_model_params, simulation_sweep_params
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+try:
+    from sweep_config import robot_model_params, simulation_sweep_params
+except ImportError as e:
+    logger.error(f"Failed to import sweep_config: {e}")
+    sys.exit(1)
 
 # Import the XML models directory function for consistency
-import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), "1_xml_generator"))
-import importlib.util
-spec = importlib.util.spec_from_file_location("xml_gen", os.path.join(os.path.dirname(__file__), "1_xml_generator", "1_generate_n_link_robot_xml.py"))
-xml_gen = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(xml_gen)
+
+try:
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "xml_gen", 
+        os.path.join(os.path.dirname(__file__), "1_xml_generator", "1_generate_n_link_robot_xml.py")
+    )
+    if spec and spec.loader:
+        xml_gen = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(xml_gen)
+    else:
+        raise ImportError("Failed to load XML generator module")
+except ImportError as e:
+    logger.error(f"Failed to import XML generator: {e}")
+    sys.exit(1)
+
 
 class ParameterSweep:
-    def __init__(self, render: bool = False, base_dir: str = None):
+    """
+    Handles automated parameter sweep for n-link robot dataset generation.
+    
+    This class manages the complete workflow from robot model generation
+    to parameter sweep execution and data organization.
+    """
+    
+    def __init__(self, render: bool = False, base_dir: Optional[str] = None) -> None:
         """
         Initialize parameter sweep.
         
         Args:
-            render (bool): Whether to enable rendering during simulations.
-            base_dir (str): Base directory for the project. If None, uses the directory of this script.
+            render: Whether to enable rendering during simulations
+            base_dir: Base directory for the project. If None, uses the directory of this script
         """
-        if base_dir is None:
-            self.base_dir = os.path.dirname(os.path.abspath(__file__))
-        else:
-            self.base_dir = base_dir
-        
+        self.base_dir = Path(base_dir) if base_dir else Path(__file__).parent
         self.render = render
         
+        # Validate configuration parameters
+        self._validate_config()
+        
         # Use imported parameter configurations
-        self.robot_model = robot_model_params
-        self.sim_sweep_params = simulation_sweep_params
+        self.robot_model = robot_model_params.copy()
+        self.sim_sweep_params = simulation_sweep_params.copy()
+        
+        logger.info("ParameterSweep initialized successfully")
+    
+    def _validate_config(self) -> None:
+        """Validate the configuration parameters."""
+        required_robot_params = ['n_links', 'link_length', 'link_radius', 'link_mass', 
+                               'joint_damping', 'torque_limit']
+        
+        for param in required_robot_params:
+            if param not in robot_model_params:
+                raise ValueError(f"Missing required robot parameter: {param}")
+        
+        required_sim_params = ['control_mode', 'sim_time']
+        for param in required_sim_params:
+            if param not in simulation_sweep_params:
+                raise ValueError(f"Missing required simulation parameter: {param}")
+        
+        logger.info("Configuration validation passed")
     
     def _create_robot_folder_name(self) -> str:
         """Create a descriptive folder name based on robot parameters."""
@@ -44,16 +105,27 @@ class ParameterSweep:
         if params.get('fingertip_mass') is not None:
             fingertip_suffix = f"_ftip{params['fingertip_mass']:.3f}"
         
-        folder_name = (f"robot_L{params['n_links']}_"
-                      f"len{params['link_length']:.2f}_"
-                      f"rad{params['link_radius']:.3f}_"
-                      f"mass{params['link_mass']:.1f}{fingertip_suffix}_"
-                      f"damp{params['joint_damping']:.2f}_"
-                      f"torq{params['torque_limit']:.1f}")
+        folder_name = (
+            f"robot_L{params['n_links']}_"
+            f"len{params['link_length']:.2f}_"
+            f"rad{params['link_radius']:.3f}_"
+            f"mass{params['link_mass']:.1f}{fingertip_suffix}_"
+            f"damp{params['joint_damping']:.2f}_"
+            f"torq{params['torque_limit']:.1f}"
+        )
         return folder_name
     
     def generate_xml_for_robot(self) -> str:
-        """Generate XML file for the robot model."""
+        """
+        Generate XML file for the robot model.
+        
+        Returns:
+            Path to the generated XML file
+            
+        Raises:
+            subprocess.CalledProcessError: If XML generation fails
+            FileNotFoundError: If generated XML file is not found
+        """
         # Create XML filename based on robot parameters
         xml_filename = f"{self._create_robot_folder_name()}.xml"
         
@@ -61,39 +133,62 @@ class ParameterSweep:
         actual_xml_dir = xml_gen.get_xml_models_dir()
         xml_path = os.path.join(actual_xml_dir, xml_filename)
         
-        # Generate XML using the new parameter system
+        # Build command for XML generation
         cmd = [
-            "python3", os.path.join(self.base_dir, "1_xml_generator/1_generate_n_link_robot_xml.py"),
+            "python3", 
+            str(self.base_dir / "1_xml_generator" / "1_generate_n_link_robot_xml.py"),
             "--num_links", str(self.robot_model["n_links"]),
             "--link_length", str(self.robot_model["link_length"]),
             "--link_radius", str(self.robot_model["link_radius"]),
             "--link_mass", str(self.robot_model["link_mass"]),
             "--joint_damping", str(self.robot_model["joint_damping"]),
             "--torque_limit", str(self.robot_model["torque_limit"]),
-            "--output_name", xml_filename  # Only pass filename, not output_dir since it uses absolute path
+            "--output_name", xml_filename
         ]
         
         # Add fingertip_mass parameter if specified
         if self.robot_model.get("fingertip_mass") is not None:
             cmd.extend(["--fingertip_mass", str(self.robot_model["fingertip_mass"])])
-            print(f"Using specified fingertip mass: {self.robot_model['fingertip_mass']:.6f} kg")
+            logger.info(f"Using specified fingertip mass: {self.robot_model['fingertip_mass']:.6f} kg")
         else:
-            print(f"Using auto-calculated fingertip mass (from link density)")
+            logger.info("Using auto-calculated fingertip mass (from link density)")
         
-        print(f"Generating XML for robot: {xml_filename}")
-        subprocess.run(cmd, check=True)
+        logger.info(f"Generating XML for robot: {xml_filename}")
         
-        # Return the actual path where the file was saved
+        try:
+            result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+            logger.debug(f"XML generation output: {result.stdout}")
+        except subprocess.CalledProcessError as e:
+            logger.error(f"XML generation failed: {e.stderr}")
+            raise
+        
+        # Verify the file was created
+        if not os.path.exists(xml_path):
+            raise FileNotFoundError(f"Generated XML file not found: {xml_path}")
+        
         return xml_path
     
     def run_simulation(self, xml_path: str, sim_params: Dict[str, Any], robot_data_dir: str) -> str:
-        """Run a single simulation with given parameters."""
+        """
+        Run a single simulation with given parameters.
         
-        # Get robot folder name
+        Args:
+            xml_path: Path to the robot XML model file
+            sim_params: Simulation parameters dictionary
+            robot_data_dir: Directory to save simulation data
+            
+        Returns:
+            Path to the generated data file
+            
+        Raises:
+            subprocess.CalledProcessError: If simulation fails
+            RuntimeError: If no data file is generated
+        """
         robot_folder_name = self._create_robot_folder_name()
         
         cmd = [
-            "python3", os.path.join(self.base_dir, "2_mujoco_sim/n_link_robot_mujoco.py"),
+            "python3", 
+            str(self.base_dir / "2_mujoco_sim" / "n_link_robot_mujoco.py"),
             "--xml_path", xml_path,
             "--sim_time", str(sim_params["sim_time"]),
             "--control_mode", sim_params["control_mode"],
@@ -115,60 +210,84 @@ class ParameterSweep:
                 "--kd", str(sim_params["kd"])
             ])
         
-        print(f"Running simulation: init={sim_params['initial_angle']:.1f}°, "
-              f"target={sim_params['target_angle']:.1f}°, "
-              f"kp={sim_params['kp']}, kd={sim_params['kd']}")
+        logger.info(
+            f"Running simulation: init={sim_params['initial_angle']:.1f}°, "
+            f"target={sim_params.get('target_angle', 'N/A'):.1f}°, "
+            f"kp={sim_params.get('kp', 'N/A')}, kd={sim_params.get('kd', 'N/A')}"
+        )
         
-        subprocess.run(cmd, check=True)
+        try:
+            result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+            logger.debug(f"Simulation output: {result.stdout}")
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Simulation failed: {e.stderr}")
+            raise
         
         # Find the most recently created data file
-        mujoco_data_dir = os.path.join(self.base_dir, "4_data/2_mujoco")
-        data_files = [f for f in os.listdir(mujoco_data_dir) if f.endswith(".json")]
-        if not data_files:
-            raise RuntimeError("No data file was generated")
+        mujoco_data_dir = self.base_dir / "4_data" / "2_mujoco"
         
-        latest_file = max(data_files, key=lambda x: os.path.getctime(os.path.join(mujoco_data_dir, x)))
-        
-        # Move the file to the robot-specific directory
-        src_path = os.path.join(mujoco_data_dir, latest_file)
-        dst_path = os.path.join(robot_data_dir, latest_file)
-        os.rename(src_path, dst_path)
-        
-        return dst_path
+        try:
+            data_files = [f for f in os.listdir(mujoco_data_dir) if f.endswith(".json")]
+            if not data_files:
+                raise RuntimeError("No data file was generated")
+            
+            latest_file = max(
+                data_files, 
+                key=lambda x: os.path.getctime(mujoco_data_dir / x)
+            )
+            
+            # Move the file to the robot-specific directory
+            src_path = mujoco_data_dir / latest_file
+            dst_path = Path(robot_data_dir) / latest_file
+            
+            os.rename(src_path, dst_path)
+            
+            return str(dst_path)
+            
+        except (OSError, IOError) as e:
+            logger.error(f"Failed to handle data file: {e}")
+            raise RuntimeError(f"Failed to handle data file: {e}")
     
-    def run_sweep(self):
+    def run_sweep(self) -> None:
         """Run the complete parameter sweep for the defined robot model."""
         # Create robot-specific data directory
         robot_folder_name = self._create_robot_folder_name()
-        robot_data_dir = os.path.join(self.base_dir, "4_data/2_mujoco/datasets", robot_folder_name)
-        os.makedirs(robot_data_dir, exist_ok=True)
+        robot_data_dir = self.base_dir / "4_data" / "2_mujoco" / "datasets" / robot_folder_name
+        robot_data_dir.mkdir(parents=True, exist_ok=True)
         
-        print(f"Creating dataset for robot: {robot_folder_name}")
-        print(f"Data will be saved to: {robot_data_dir}")
+        logger.info(f"Creating dataset for robot: {robot_folder_name}")
+        logger.info(f"Data will be saved to: {robot_data_dir}")
         
         # Show robot configuration including fingertip mass
-        print(f"\nRobot configuration:")
+        logger.info("Robot configuration:")
         for key, value in self.robot_model.items():
-            print(f"  {key}: {value}")
+            logger.info(f"  {key}: {value}")
         
         # Generate XML for the robot model (only once)
-        xml_path = self.generate_xml_for_robot()
+        try:
+            xml_path = self.generate_xml_for_robot()
+        except Exception as e:
+            logger.error(f"Failed to generate XML: {e}")
+            return
         
         # Generate all simulation parameter combinations
         sim_combinations = self._generate_param_combinations(self.sim_sweep_params)
         
-        print(f"Running {len(sim_combinations)} simulations...")
+        logger.info(f"Running {len(sim_combinations)} simulations...")
         
         results = []
+        successful_sims = 0
+        
         for i, sim_params in enumerate(sim_combinations, 1):
-            print(f"\nSimulation {i}/{len(sim_combinations)}")
+            logger.info(f"Simulation {i}/{len(sim_combinations)}")
             
             # Skip invalid combinations
             if not self._is_valid_combination(sim_params):
+                logger.warning(f"Skipping invalid parameter combination: {sim_params}")
                 continue
             
             try:
-                data_path = self.run_simulation(xml_path, sim_params, robot_data_dir)
+                data_path = self.run_simulation(xml_path, sim_params, str(robot_data_dir))
                 results.append({
                     "robot_model": self.robot_model,
                     "sim_params": sim_params,
@@ -176,36 +295,52 @@ class ParameterSweep:
                     "data_path": data_path,
                     "simulation_id": i
                 })
+                successful_sims += 1
+                
             except Exception as e:
-                print(f"Error in simulation {i}: {e}")
+                logger.error(f"Error in simulation {i}: {e}")
                 continue
         
         # Save sweep metadata
-        self._save_sweep_metadata(results, robot_data_dir)
+        try:
+            self._save_sweep_metadata(results, str(robot_data_dir))
+        except Exception as e:
+            logger.error(f"Failed to save metadata: {e}")
         
-        print(f"\nDataset generation complete!")
-        print(f"Generated {len(results)} simulations")
-        print(f"Robot model: {self.robot_model}")
-        print(f"Data saved to: {robot_data_dir}")
+        logger.info("Dataset generation complete!")
+        logger.info(f"Successful simulations: {successful_sims}/{len(sim_combinations)}")
+        logger.info(f"Robot model: {self.robot_model}")
+        logger.info(f"Data saved to: {robot_data_dir}")
     
     def _generate_param_combinations(self, params: Dict[str, List[Any]]) -> List[Dict[str, Any]]:
         """Generate all combinations of simulation parameters."""
-        keys = params.keys()
-        values = params.values()
+        if not params:
+            return []
+        
+        keys = list(params.keys())
+        values = list(params.values())
+        
         combinations = []
         for combination in itertools.product(*values):
             combinations.append(dict(zip(keys, combination)))
+        
         return combinations
     
     def _is_valid_combination(self, sim_params: Dict[str, Any]) -> bool:
         """Check if simulation parameter combination is valid."""
-        if sim_params["control_mode"] == "constant":
+        control_mode = sim_params.get("control_mode")
+        
+        if control_mode == "constant":
             return "constant_torque" in sim_params
-        elif sim_params["control_mode"] == "pd":
+        elif control_mode == "pd":
             return all(k in sim_params for k in ["target_angle", "kp", "kd"])
-        return True
+        elif control_mode == "random":
+            return True
+        else:
+            logger.warning(f"Unknown control mode: {control_mode}")
+            return False
     
-    def _save_sweep_metadata(self, results: List[Dict[str, Any]], robot_data_dir: str):
+    def _save_sweep_metadata(self, results: List[Dict[str, Any]], robot_data_dir: str) -> None:
         """Save metadata about the parameter sweep."""
         metadata = {
             "robot_model": self.robot_model,
@@ -216,19 +351,52 @@ class ParameterSweep:
             "results": results
         }
         
-        output_file = os.path.join(robot_data_dir, "dataset_metadata.json")
-        with open(output_file, "w") as f:
-            json.dump(metadata, f, indent=4)
+        output_file = Path(robot_data_dir) / "dataset_metadata.json"
         
-        print(f"Dataset metadata saved to {output_file}")
+        try:
+            with open(output_file, "w") as f:
+                json.dump(metadata, f, indent=4)
+            logger.info(f"Dataset metadata saved to {output_file}")
+        except (IOError, OSError) as e:
+            logger.error(f"Failed to save metadata: {e}")
+            raise
 
-def main():
-    parser = argparse.ArgumentParser(description="Generate dataset for MuJoCo n-link robot with parameter sweep")
-    parser.add_argument('--render', action='store_true', help='Enable rendering (visualization)')
+
+def main() -> None:
+    """Main entry point for the dataset generation script."""
+    parser = argparse.ArgumentParser(
+        description="Generate dataset for MuJoCo n-link robot with parameter sweep",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+    parser.add_argument(
+        '--render', 
+        action='store_true', 
+        help='Enable rendering (visualization) - slower but useful for debugging'
+    )
+    parser.add_argument(
+        '--no-render', 
+        dest='render', 
+        action='store_false', 
+        help='Disable rendering for faster execution (default)'
+    )
+    parser.add_argument(
+        '--base-dir',
+        type=str,
+        help='Base directory for the project (default: script directory)'
+    )
+    parser.set_defaults(render=False)
+    
     args = parser.parse_args()
     
-    sweep = ParameterSweep(render=args.render)
-    sweep.run_sweep()
+    try:
+        sweep = ParameterSweep(render=args.render, base_dir=args.base_dir)
+        sweep.run_sweep()
+    except KeyboardInterrupt:
+        logger.info("Dataset generation interrupted by user")
+    except Exception as e:
+        logger.error(f"Dataset generation failed: {e}")
+        sys.exit(1)
+
 
 if __name__ == "__main__":
     main() 

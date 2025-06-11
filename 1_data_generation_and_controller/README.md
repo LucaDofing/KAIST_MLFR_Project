@@ -252,7 +252,7 @@ python3 2_mujoco_sim/n_link_robot_mujoco.py [OPTIONS]
 ```bash
 # Visualized PD control simulation
 python3 2_mujoco_sim/n_link_robot_mujoco.py \
-  --xml_path 4_data/1_xml_models/my_robot.xml \
+  --xml_path 4_data/1_xml_models/n_link_robot.xml \
   --control_mode pd \
   --target_angle 45.0 \
   --kp 10.0 \
@@ -341,8 +341,6 @@ python3 main.py --render
 # Generate dataset without visualization (faster - recommended)
 python3 main.py --no-render
 
-# Generate dataset in specific directory
-python3 main.py --no-render --base_dir /path/to/custom/directory
 ```
 
 ### Dataset Structure
@@ -402,20 +400,6 @@ simulation_sweep_params = {
 # Total: 2 × 7 × 10 × 5 × 5 × 4 × 3 = 21,000 simulations
 ```
 
-**3. Computational Considerations**
-```bash
-# Estimated time per simulation: 2-10 seconds
-# For 1000 simulations: 0.5-3 hours
-# For 10,000 simulations: 5-30 hours
-
-# Use --no-render for maximum speed
-python3 main.py --no-render
-
-# Monitor progress with detailed output
-python3 main.py --no-render 2>&1 | tee dataset_generation.log
-```
-
----
 
 ## 📈 Data Analysis & Visualization
 
