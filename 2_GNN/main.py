@@ -94,6 +94,9 @@ def main():
             print("True physical damping coeff 'b' (from JSON):")
             print(sample.y_true_damping_b.cpu().numpy())
         print(f"  (using mass: {sample.mass.item():.4f}, L_com_gravity: {sample.length_com_for_gravity.item():.4f}, I_yy: {sample.inertia_yy.item():.6e}, dt: {sample.dt_step.item()}, g: {sample.gravity_accel.item()})")
+        # At the end of run_training or main
+        torch.save(model.state_dict(), 'damping_gcn.pth')
+        print("Saved trained model to damping_gcn.pth")
 
 if __name__ == "__main__":
     main()
