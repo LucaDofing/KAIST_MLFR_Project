@@ -1,8 +1,0 @@
-Why GNN: robotic systems are graphs (joints = nodes, links = edges), requiring variable-size input handling.
-Why GCN: simple, efficient, good for static graphs where local physical influences dominate.
-
-
-Upgrades to consider
-- GAT (Graph Attention Network) --> Learn which joints matter more dynamically
-- MPNN (Message Passing Neural Networks) --> Model richer interactions between joints
-- Temporal GNNs --> Capture motion over time, not just one snapshot

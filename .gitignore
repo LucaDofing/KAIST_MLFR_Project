@@ -12,4 +12,4 @@ src/__pycache__
 #ignore pycache
 __pycache__/
 # ignore venv
-
+2_GNN/damping_gcn.pth
