@@ -59,7 +59,7 @@ The following specifications were used for the damping analysis:
 - **Control Type**: PD Controller
 
 #### 2.3.2 Results
-
+##### Damping
 The following figure illustrates how different damping values significantly influence the system's response and settling behavior:
 <div align="center">
 <table>
@@ -72,6 +72,17 @@ The trajectory comparison clearly demonstrates that:
 - **Higher damping** results in more conservative, slower convergence with reduced overshoot
 - **Lower damping** produces faster response but with increased oscillatory behavior
 - **Intermediate damping** values provide balanced performance between speed and stability
+
+##### Sim-time
+The simulation results demonstrate that data points can be generated efficiently without requiring high-end hardware.
+The plot illustrates the computation time needed to simulate data points on an Intel i5-8350U CPU with 4 cores.
+<div align="center">
+<table>
+<tr>
+<td align="center"><img src="Sim_time.png" width="700"><br><b>Damping Effect on 1-DOF Manipulator Trajectory</b></td>
+</tr>
+</table>
+</div>
 
 #### 2.3.3 Data Generation Strategy
 
