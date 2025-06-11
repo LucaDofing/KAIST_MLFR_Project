@@ -20,9 +20,9 @@ The simulation framework employs a **parametric design approach** that automatic
 <div align="center">
 <table>
 <tr>
-<td align="center"><img src="Mujocosim_1_links.png" width="400"><br><b>Single-Link Manipulator (1-DOF)</b></td>
-<td align="center"><img src="Mujocosim_2_links.png" width="400"><br><b>Two-Link Manipulator (2-DOF)</b></td>
-<td align="center"><img src="Mujocosim_3_links.png" width="400"><br><b>Three-Link Manipulator (3-DOF)</b></td>
+<td align="center"><img src="Figures/Mujocosim_1_links.png" width="400"><br><b>Single-Link Manipulator (1-DOF)</b></td>
+<td align="center"><img src="Figures/Mujocosim_2_links.png" width="400"><br><b>Two-Link Manipulator (2-DOF)</b></td>
+<td align="center"><img src="Figures/Mujocosim_3_links.png" width="400"><br><b>Three-Link Manipulator (3-DOF)</b></td>
 </tr>
 </table>
 </div>
@@ -65,7 +65,7 @@ The following figure illustrates how different damping values significantly infl
 <div align="center">
 <table>
 <tr>
-<td align="center"><img src="damping_comparison.png" width="1500"><br><b>Damping Effect on 1-DOF Manipulator Trajectory</b></td>
+<td align="center"><img src="Figures/damping_comparison.png" width="1500"><br><b>Damping Effect on 1-DOF Manipulator Trajectory</b></td>
 </tr>
 </table>
 </div>
@@ -81,7 +81,7 @@ The plot illustrates the computation time needed to simulate data points on an I
 <div align="center">
 <table>
 <tr>
-<td align="center"><img src="Sim_time.png" width="700"><br><b>Damping Effect on 1-DOF Manipulator Trajectory</b></td>
+<td align="center"><img src="Figures/Sim_time.png" width="700"><br><b>Damping Effect on 1-DOF Manipulator Trajectory</b></td>
 </tr>
 </table>
 </div>
