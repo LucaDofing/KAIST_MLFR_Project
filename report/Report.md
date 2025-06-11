@@ -93,11 +93,11 @@ The system features an **automated XML generation pipeline** that:
 **Code Architecture**:
 ```
 Parameter Space → XML Generation → MuJoCo Engine → PD Control → Data Export
-      ↓               ↓              ↓              ↓           ↓
-   • n-links       • Dynamic      • Physics      • Torque    • JSON
-   • Masses        • Geometry     • Integration  • Limits    • Metadata  
-   • Damping       • Joints       • Constraints  • Tracking  • Trajectories
-   • Controllers   • Actuators    • Rendering    • Response  • Parameters
+    ↓               ↓              ↓              ↓           ↓
+• n-links       • Dynamic      • Physics      • Torque    • JSON
+• Masses        • Geometry     • Integration  • Limits    • Metadata  
+• Damping       • Joints       • Constraints  • Tracking  • Trajectories
+• Controllers   • Actuators    • Rendering    • Response  • Parameters
 ```
 
 
@@ -288,7 +288,7 @@ Figure 3.3 shows the distribution of the estimated damping coefficient `b` acros
 </tr>
 </table>
 </div>
-*Figure 3.3: Distribution of the GNN-Estimated Damping Coefficient "b" on the Test Set. Instead of converging to the true value (0.7), the model learned a bimodal distribution, pushing estimates to the extremes.*
+Figure 3.3: Distribution of the GNN-Estimated Damping Coefficient "b" on the Test Set. Instead of converging to the true value (0.7), the model learned a bimodal distribution, pushing estimates to the extremes.
 
 This result demonstrates that the model did not identify the physical parameter. Instead, it learned to use the damping coefficient as an "effective" parameter, essentially a binary switch: for a given state, it applies either maximum damping (by outputting a value near 1.0) or minimum damping (by outputting a value near 0.0) to best match the next state in its internal physics simulation.
 
@@ -307,6 +307,32 @@ The GNN successfully minimized its objective function (MSE loss), leading to exc
 -   **Parameter Identifiability:** The GNN's output `b` is just one of many parameters in the `simulate_step_physical` function. The model discovered that aggressively modulating this single parameter was a highly effective strategy for controlling the simulation's outcome, without needing to be physically accurate.
 
 -   **Loss Function and Input Features:** While using raw `θ` as input and an unweighted MSE loss are not ideal, the excellent prediction accuracy suggests they were not the primary bottlenecks. The model was powerful enough to succeed at its prediction task despite these limitations. The core issue lies in the discrepancy between the training simulator and the data-generating simulator.
+
+Of course. Here is a paragraph for your report that interprets the plot you generated. It's written to fit perfectly into the "Analysis of Error Propagation and Model Mismatch" section we designed.
+
+### 3.4.3 Analysis of Error Propagation and Model Mismatch
+
+To investigate the source of the discrepancy between the GNN's high predictive accuracy and its poor parameter identification, we performed a sensitivity analysis on a representative sample from the test set. The goal was to visualize the "loss landscape" from the perspective of our simplified, differentiable physics simulator by computing the next-state prediction error (MSE) across a wide range of possible damping coefficients. This reveals which damping value truly minimizes the prediction error for our specific simulator, irrespective of the true physical value.
+
+<div align="center">
+<table>
+<tr>
+<td align="center"><img src="Figures/error_propagation.png" width="1500"><br><b>XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX</b></td>
+</tr>
+</table>
+</div>
+Figure 3.4 presents the resulting loss landscape for a single time-step. The x-axis represents the damping coefficient `b` used in our simulation, and the y-axis shows the resulting prediction error.
+
+The plot reveals a critical disconnect between the physically correct parameter and the optimal parameter for our model:
+
+1.  **True Damping (`b = 0.70`):** Using the true physical damping (red line) in our simulator results in a significant, non-zero prediction error of `MSE = 0.0270`. If our simulator were a perfect model of the MuJoCo environment, this point would represent the minimum of the loss curve. The fact that it does not is a quantitative measure of the **systematic error** introduced by our simplified integrator.
+
+2.  **GNN Prediction (`b̂ = 1.00`):** The damping value predicted by the GNN (green line) achieves a lower prediction error of `MSE = 0.0238`. This demonstrates that the GNN is performing its optimization task correctly: it has successfully found a parameter that improves its predictive accuracy relative to the ground-truth physical value.
+
+3.  **Optimal Damping (`b_optimal = 2.00`):** The true minimum of this loss landscape (purple line) occurs at a damping value of `b = 2.00`. This indicates that for this specific state transition, the most accurate prediction with our simplified physics kernel would require a non-physical damping value of 2.0.
+
+**Conclusion:**
+This analysis visually confirms that the GNN is not 'wrong'; it is correctly optimizing the objective function it was given. The discrepancy arises because the objective function itself is flawed due to the systematic model mismatch. The GNN learns to output a physically inaccurate parameter because that parameter provides a better result for its own imperfect world model. It is learning an "effective" parameter that compensates for simulation inaccuracies, rather than the true physical one.
 
 ### 3.5 Future Work and Potential Improvements for GNN Module
 
