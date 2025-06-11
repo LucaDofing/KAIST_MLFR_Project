@@ -346,12 +346,13 @@ This analysis visually confirms that the GNN is not 'wrong'; it is correctly opt
 
 This is the most critical category and the highest priority for future work. The goal is to make the differentiable simulator behave as closely as possible to the MuJoCo environment.
 
-#### **Idea 1.1: Implement a Higher-Fidelity Differentiable Integrator (Highest Priority)**
-*   **Problem:** The semi-implicit Euler integrator introduces systematic error compared to MuJoCo's implicit solver.
-*   **Solution:** Replace the Euler integrator in `simulate_step_physical` with a more accurate, yet still differentiable, method.
-    *   **Runge-Kutta 4 (RK4):** This is the classic, high-impact choice. It's significantly more accurate than Euler and can be implemented differentiably in PyTorch. It involves more computation per step but would drastically reduce the model mismatch.
-    *   **Verlet or Leapfrog Integration:** These are other common methods in physics simulation that offer better stability and energy conservation properties than Euler, and they are also straightforward to implement.
-*   **Expected Outcome:** The error landscape's minimum should shift much closer to the true physical parameter, forcing the GNN to learn a more physically plausible value.
+#### **Idea 1.1: Implement Temporal Context for Damping Learning (Highest Priority)**
+*   **Problem:** Single timestep predictions cannot capture damping signatures. Damping effects are inherently temporal - they manifest over multiple timesteps as energy dissipation patterns, not instantaneous state changes.
+*   **Solution:** Replace the single-step prediction approach with temporal sequence modeling to make damping effects observable and learnable.
+    *   **Multi-Step Prediction Windows:** Input current state + previous N states `[x_{t-N}, ..., x_{t-1}, x_t]`, output next M states `[x_{t+1}, ..., x_{t+M}]`. Damping patterns emerge over multiple timesteps where energy dissipation becomes the dominant observable.
+    *   **Sequence-to-Damping Architecture:** Process trajectory segments (10-20 timesteps) with temporal graphs where nodes = timesteps and edges = temporal connections. Model learns damping from observed energy dissipation patterns rather than single-step state transitions.
+    *   **Recurrent Physics Integration:** Use GNN + LSTM/GRU to maintain temporal state and predict damping using history, integrating physics over longer horizons (50-100 steps) where damping effects accumulate.
+*   **Expected Outcome:** Damping signatures become visible over extended time periods, enabling the model to learn from energy conservation patterns rather than trying to infer parameters from single timestep transitions where damping effects are negligible compared to gravity and applied torques.
 
 #### **Idea 1.2: Model More Complex Physical Effects**
 *   **Problem:** The current model only considers viscous damping. Real systems have more complex friction.
