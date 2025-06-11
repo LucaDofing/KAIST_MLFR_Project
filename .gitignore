@@ -8,3 +8,7 @@ src/__pycache__
 1_data_generation_and_controller/4_data/Documentation
 1_data_generation_and_controller/0_2dlinksim
 .venv/
+#ignore pyc
+#ignore pycache
+__pycache__/
+# ignore venv
