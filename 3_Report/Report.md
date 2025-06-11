@@ -403,7 +403,7 @@ This category focuses on making the problem easier for the GNN to solve by provi
 
 | Category | Future Work Idea | Problem Addressed | Expected Benefit |
 | :--- | :--- | :--- | :--- |
-| **Model Fidelity** | **1.1 Higher-Fidelity Integrator (RK4)** | Systematic error from simple simulator. | Drastically reduces model mismatch, aligns error minimum with true parameter. |
+| **Model Fidelity** | **1.1 Include Temporal Context** | Bad damping prediction. | Damping Effect is more significant along multiple timesteps. |
 | | **1.2 Model More Physics (Friction)** | GNN compensates for unmodeled effects. | Provides a more complete physical model, isolating the target parameter. |
 | **Learning Guidance**| **2.1 Output Regularization (Variance)** | GNN learns a high-variance, bimodal distribution. | Forces the GNN to find a single, consistent parameter value. |
 | | **2.2 Constrained Output (Sigmoid)** | GNN predicts values in an unbounded range. | Enforces physical plausibility and can stabilize optimization. |
