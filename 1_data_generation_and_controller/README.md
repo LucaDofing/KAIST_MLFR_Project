@@ -11,11 +11,11 @@ A comprehensive MuJoCo-based simulation framework for n-link robots with configu
 cd KAIST_MLFR_Project/1_data_generation_and_controller
 
 # Create and activate virtual environment
-python3 -m venv 2dlinksim
-source 2dlinksim/bin/activate  # On Windows: 2dlinksim\Scripts\activate
+python3 -m venv 0_2dlinksim
+source 0_2dlinksim/bin/activate  # On Windows: 2dlinksim\Scripts\activate
 
 # Install required dependencies
-pip install mujoco matplotlib numpy glfw
+pip install -r requirements.txt
 ```
 
 **Required Python packages:**
