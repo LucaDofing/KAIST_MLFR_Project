@@ -1,7 +1,7 @@
 # GNNSys Id: Learning Physical Parameters from Motion Using Graph Neural Networks for Robot Control
 ## 1. Introduction 
 
-Robots frequently encounter unpredictable internal mechanics like friction and micro slip, which are hard to model and harm performance. Instead of manual calibration or external sensors, this project uses simulation based Graph Neural Networks to identify internal dynamics from motion data in a self supervised manner, efficiently addressing limited computational resources.
+Robots frequently encounter unpredictable internal mechanics like friction and micro slip, which are hard to model and harm performance. Instead of manual calibration or external sensors, this project uses simulation based Graph Neural Networks to identify internal dynamics from motion data in a self supervised manner, efficiently addressing our limited computational resources.
 
 
 
@@ -12,7 +12,7 @@ MuJoCo was chosen for its computational efficiency, broad use in the reinforceme
 
 ### 2.1 Modular N-Link Architecture
 
-The simulation framework employs a **parametric design approach** that automatically constructs n-link robotic manipulators based on configuration parameters. This modular system allows to:
+The simulation framework employs a **parametric design approach** that automatically constructs n-link robotic manipulators based on configuration parameters. This modular system allows for:
 
 - **Scalable Design**: Automatically generate 1-link to n-link configurations
 - **Parameter Studies**: Systematically analyze how damping, friction link count etc. affects the trajectory
@@ -32,10 +32,11 @@ The simulation framework employs a **parametric design approach** that automatic
 With the model setup several parameters such as inertia, mass, damping, friciton, gear ratios, maximum applied torque can be defined.
 
 ### 2.3 Damping Effect Analysis
-In the ater GNN our Goal was it to estimate the damping of the generated robot setup. To validate that a proper damping estimation is crucial for predicting the system response an identical physical 1-link simulaton was performed under varying damping parameters.
+In the later GNN our goal was it to estimate the damping of the generated robot setup. To validate that a proper damping estimation is crucial for predicting the system response an identical physical 1-link simulaton was performed under varying damping parameters.
 
 #### 2.3.1 Experimental Setup
 The following specifications were used for the damping analysis:
+
 **Physical Properties:**
 - **Mass**: 3.0 kg (main link body)
 - **Fingertip Mass**: 0.5 kg (end effector)
@@ -69,6 +70,7 @@ The following figure illustrates how different damping values significantly infl
 </table>
 </div>
 The trajectory comparison clearly demonstrates that:
+
 - **Higher damping** results in more conservative, slower convergence with reduced overshoot
 - **Lower damping** produces faster response but with increased oscillatory behavior
 - **Intermediate damping** values provide balanced performance between speed and stability
@@ -107,7 +109,7 @@ Parameter Space → XML Generation → MuJoCo Engine → PD Control → Data Exp
 - **Accelerated Validation**: Speed up simulation playback to quickly assess trajectory behavior and validate parameter configurations across longer time horizons
 
 
-### 2.6.Feature Work
+### 2.6.Future Work
 
 #### 2.6.1 Intelligent Data Collection
 - **Trajectory Quality Assessment**: Automatically evaluate data richness and truncate trajectories at steady-state
@@ -233,9 +235,7 @@ The angular acceleration $\alpha_t$ is calculated from this equation. The next s
 
 All hyperparameters are managed in `src/config.py`.
 
-Of course. These plots tell a very clear and interesting story. The model is an excellent predictor but a poor parameter identifier, which is a fantastic result to analyze.
-
-Here are the "Results" and "Discussion" sections of your report, filled out with a detailed interpretation of your plots.
+These plots tell a show that the model is an excellent predictor but a poor parameter identifier, which is an interesting result to analyze.
 
 ### 3.3 Experiments and Results
 
@@ -255,28 +255,26 @@ Figure 3.1 shows the training and validation loss curves over 50 epochs. Both lo
 <div align="center">
 <table>
 <tr>
-<td align="center"><img src="Figures/loss_curve.png" width="1500"><br><b>XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX</b></td>
+<td align="center"><img src="Figures/loss_curve.png" width="1500"><br><b>Figure 3.1: Training and Validation MSE Loss vs. Epochs. The model shows smooth convergence with no signs of overfitting.</b></td>
 </tr>
 </table>
 </div>
-*Figure 3.1: Training and Validation MSE Loss vs. Epochs. The model shows smooth convergence with no signs of overfitting.*
 
 This high predictive accuracy is further confirmed by the scatter plots in Figure 3.2. For both the next angle (`θ_t+1`) and the next angular velocity (`ω_t+1`), the predicted values are tightly clustered around the `y=x` line, which represents a perfect prediction. This demonstrates that the model learned the system's dynamics with high fidelity.
 
 <div align="center">
 <table>
 <tr>
-<td align="center"><img src="Figures/prediction_scatter.png" width="1500"><br><b>XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX</b></td>
+<td align="center"><img src="Figures/prediction_scatter.png" width="1500"><br><b>Figure 3.2: Predicted vs. True Next-State Values on the Test Set. The tight correlation to the y=x line indicates high prediction accuracy for both angle and angular velocity.</b></td>
 </tr>
 </table>
 </div>
-*Figure 3.2: Predicted vs. True Next-State Values on the Test Set. The tight correlation to the y=x line indicates high prediction accuracy for both angle and angular velocity.*
 
 #### 3.3.3 Damping Coefficient Estimation
 
 While the model excelled at prediction, its ability to identify the underlying physical damping coefficient was poor. The core goal was to see if the GNN would infer the true value of `b_true = 0.7` simply by minimizing prediction error.
 
-Figure 3.3 shows the distribution of the estimated damping coefficient `b` across all samples in the test set. The results are striking:
+Figure 3.3 shows the distribution of the estimated damping coefficient `b` across all samples in the test set. The results are show:
 -   The GNN did **not** learn to output a value near the true `b` of 0.7.
 -   Instead, the model's estimates are **bimodal**, clustered at the extremes of a `[0, 1]` range, with large peaks near `b=0.0` and `b=1.0`.
 -   The calculated mean of the estimated `b` is **0.57**, but this value is misleading as very few predictions actually fall near the mean. It is simply an average of the two extreme clusters.
@@ -284,11 +282,10 @@ Figure 3.3 shows the distribution of the estimated damping coefficient `b` acros
 <div align="center">
 <table>
 <tr>
-<td align="center"><img src="Figures/damping_distribution.png" width="1500"><br><b>XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX</b></td>
+<td align="center"><img src="Figures/damping_distribution.png" width="1500"><br><b>Figure 3.3: Distribution of the GNN-Estimated Damping Coefficient "b" on the Test Set. Instead of converging to the true value (0.7), the model learned a bimodal distribution, pushing estimates to the extremes.</b></td>
 </tr>
 </table>
 </div>
-Figure 3.3: Distribution of the GNN-Estimated Damping Coefficient "b" on the Test Set. Instead of converging to the true value (0.7), the model learned a bimodal distribution, pushing estimates to the extremes.
 
 This result demonstrates that the model did not identify the physical parameter. Instead, it learned to use the damping coefficient as an "effective" parameter, essentially a binary switch: for a given state, it applies either maximum damping (by outputting a value near 1.0) or minimum damping (by outputting a value near 0.0) to best match the next state in its internal physics simulation.
 
@@ -298,7 +295,7 @@ This result demonstrates that the model did not identify the physical parameter.
 
 The experiments reveal a critical insight into this unsupervised system identification approach: **a model that is highly effective at predicting system dynamics is not necessarily effective at identifying the true physical parameters.**
 
-The GNN successfully minimized its objective function (MSE loss), leading to excellent next-state predictions. However, it achieved this by finding a "shortcut" rather than learning the ground-truth physics. The bimodal distribution of the estimated damping `b` shows that the model learned to treat the parameter as a powerful, non-physical switch to correct for errors in its own internal, simplified physics model. This highlights a fundamental challenge of identifiability: multiple parameter settings (in this case, a state-dependent switching between 0.0 and 1.0) can produce prediction results that are just as good as, or even better than, using the single true physical value.
+The GNN successfully minimized its objective function (MSE loss), leading to good next-state predictions. However, it achieved this by finding a "shortcut" rather than learning the ground-truth physics. The bimodal distribution of the estimated damping `b` shows that the model learned to treat the parameter as a powerful, non-physical switch to correct for errors in its own internal, simplified physics model. This highlights a fundamental challenge of identifiability: multiple parameter settings (in this case, a state-dependent switching between 0.0 and 1.0) can produce prediction results that are just as good as, or even better than, using the single true physical value.
 
 #### 3.4.2 Impact of Data and Model Fidelity
 
@@ -308,8 +305,6 @@ The GNN successfully minimized its objective function (MSE loss), leading to exc
 
 -   **Loss Function and Input Features:** While using raw `θ` as input and an unweighted MSE loss are not ideal, the excellent prediction accuracy suggests they were not the primary bottlenecks. The model was powerful enough to succeed at its prediction task despite these limitations. The core issue lies in the discrepancy between the training simulator and the data-generating simulator.
 
-Of course. Here is a paragraph for your report that interprets the plot you generated. It's written to fit perfectly into the "Analysis of Error Propagation and Model Mismatch" section we designed.
-
 ### 3.4.3 Analysis of Error Propagation and Model Mismatch
 
 To investigate the source of the discrepancy between the GNN's high predictive accuracy and its poor parameter identification, we performed a sensitivity analysis on a representative sample from the test set. The goal was to visualize the "loss landscape" from the perspective of our simplified, differentiable physics simulator by computing the next-state prediction error (MSE) across a wide range of possible damping coefficients. This reveals which damping value truly minimizes the prediction error for our specific simulator, irrespective of the true physical value.
@@ -317,11 +312,10 @@ To investigate the source of the discrepancy between the GNN's high predictive a
 <div align="center">
 <table>
 <tr>
-<td align="center"><img src="Figures/error_propagation.png" width="1500"><br><b>XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX</b></td>
+<td align="center"><img src="Figures/error_propagation.png" width="1500"><br><b>Figure 3.4 presents the resulting loss landscape for a single time-step. The x-axis represents the damping coefficient `b` used in our simulation, and the y-axis shows the resulting prediction error.</b></td>
 </tr>
 </table>
 </div>
-Figure 3.4 presents the resulting loss landscape for a single time-step. The x-axis represents the damping coefficient `b` used in our simulation, and the y-axis shows the resulting prediction error.
 
 The plot reveals a critical disconnect between the physically correct parameter and the optimal parameter for our model:
 
@@ -334,20 +328,77 @@ The plot reveals a critical disconnect between the physically correct parameter 
 **Conclusion:**
 This analysis visually confirms that the GNN is not 'wrong'; it is correctly optimizing the objective function it was given. The discrepancy arises because the objective function itself is flawed due to the systematic model mismatch. The GNN learns to output a physically inaccurate parameter because that parameter provides a better result for its own imperfect world model. It is learning an "effective" parameter that compensates for simulation inaccuracies, rather than the true physical one.
 
-### 3.5 Future Work and Potential Improvements for GNN Module
 
-Based on the results, the following steps could lead to more accurate physical parameter identification:
+### 3.5 Future Work and Potential Improvements
 
--   **Improve the Differentiable Simulator:** The highest-priority improvement is to implement a more accurate differentiable integrator (e.g., Runge-Kutta 4) in the `simulate_step_physical` function. This would reduce the model mismatch, making it harder for the GNN to "cheat" and forcing it to find more physically plausible parameter values.
+### **A: Directly Addressing the Model Mismatch**
 
--   **Regularize the GNN Output:** To prevent the bimodal "switching" behavior, a regularization term could be added to the loss function. For example, a term that penalizes variance or encourages the output to be close to an expected value could force the GNN to converge to a single, more stable estimate.
-    ```python
-    # Example loss
-    prediction_loss = F.mse_loss(pred_next, true_next)
-    variance_penalty = torch.var(estimated_b)
-    loss = prediction_loss + lambda * variance_penalty
-    ```
+This is the most critical category and the highest priority for future work. The goal is to make the differentiable simulator behave as closely as possible to the MuJoCo environment.
 
--   **Constrain the Output Activation:** The current model uses a ReLU output, allowing `b` to be any non-negative value. The learned distribution suggests the model is saturating near 1.0. Replacing the final activation with a scaled `Sigmoid` function could constrain the output to a more physically plausible range (e.g., `[0, 2]`) and encourage a less extreme output distribution.
+#### **Idea 1.1: Implement a Higher-Fidelity Differentiable Integrator (Highest Priority)**
+*   **Problem:** The semi-implicit Euler integrator introduces systematic error compared to MuJoCo's implicit solver.
+*   **Solution:** Replace the Euler integrator in `simulate_step_physical` with a more accurate, yet still differentiable, method.
+    *   **Runge-Kutta 4 (RK4):** This is the classic, high-impact choice. It's significantly more accurate than Euler and can be implemented differentiably in PyTorch. It involves more computation per step but would drastically reduce the model mismatch.
+    *   **Verlet or Leapfrog Integration:** These are other common methods in physics simulation that offer better stability and energy conservation properties than Euler, and they are also straightforward to implement.
+*   **Expected Outcome:** The error landscape's minimum should shift much closer to the true physical parameter, forcing the GNN to learn a more physically plausible value.
 
--   **Simultaneous Multi-Parameter Estimation:** A more advanced goal would be to have the GNN estimate multiple parameters at once (e.g., mass, inertia, and damping). This would be significantly more challenging but would better test the GNN's ability to disentangle the effects of different physical properties.
+#### **Idea 1.2: Model More Complex Physical Effects**
+*   **Problem:** The current model only considers viscous damping. Real systems have more complex friction.
+*   **Solution:** Enhance the `simulate_step_physical` function by adding more terms to the equation of motion.
+    *   **Coulomb Friction:** Add a term ` -c * sign(omega)`, where `c` is a constant friction coefficient. The `sign()` function has a non-differentiable point at zero, which can be handled with a smooth approximation like `tanh(k * omega)` for a large `k`.
+    *   **Stiction:** Model static friction, which is more complex but crucial for movements starting from rest.
+*   **Expected Outcome:** By accounting for more of the true physics, the GNN has less unmodeled behavior to compensate for, allowing it to focus on identifying the correct parameters for the modeled effects.
+
+### **B: Guiding the GNN's Learning Process**
+
+This category assumes that some model mismatch will always exist. These techniques help "guide" the GNN towards a better solution instead of letting it exploit loopholes.
+
+#### **Idea 2.1: Introduce Regularization on the GNN's Output**
+*   **Problem:** The GNN learned a bimodal distribution, suggesting it found it optimal to have a high-variance output.
+*   **Solution:** Add a penalty term to the loss function that discourages this behavior.
+    *   **Variance Regularization:** Penalize the variance of the GNN's predicted `b` values within a batch. `loss = prediction_loss + λ * torch.var(estimated_b)`. This would push the GNN to output a consistent, single value across different states.
+    *   **Sparsity or L1 Regularization:** If the true parameter is expected to be small, one could add an L1 penalty on the output: `loss = prediction_loss + λ * torch.mean(torch.abs(estimated_b))`.
+*   **Expected Outcome:** The learned distribution of `b` should become unimodal and more tightly clustered, even if the mean is still slightly off due to model mismatch.
+
+#### **Idea 2.2: Constrain the GNN's Output Activation**
+*   **Problem:** The current ReLU output is unbounded, and the model learned to saturate near the extremes of its observed range (`[0, 1]`).
+*   **Solution:** Replace the final activation function with one that enforces a physically plausible range.
+    *   **Scaled Sigmoid Function:** `output = min_val + (max_val - min_val) * torch.sigmoid(linear_output)`. For example, if one knows the damping `b` should be between 0 and 2, one can enforce this.
+    *   **Softplus or Tanh:** These can also provide smooth, bounded, or one-sided outputs that might lead to more stable training than an unbounded ReLU.
+*   **Expected Outcome:** This prevents the GNN from predicting wildly unrealistic parameter values and can stabilize the optimization landscape.
+
+### **C: Improving the Experimental Design and Data**
+
+This category focuses on making the problem easier for the GNN to solve by providing better data.
+
+#### **Idea 3.1: Active Learning for Data Generation**
+*   **Problem:** The training data might not contain enough dynamic richness to make the different physical parameters "identifiable."
+*   **Solution:** Instead of generating data randomly, use an "active learning" loop.
+    1.  Train the GNN on an initial dataset.
+    2.  Identify the states or trajectories where the GNN is most uncertain or has the highest prediction error.
+    3.  Generate *new* MuJoCo data specifically in those challenging regimes.
+    4.  Add this new data to the training set and repeat.
+*   **Expected Outcome:** This focuses the data generation effort on the parts of the state space where the parameters have the most significant and distinguishable effects, improving parameter identifiability.
+
+#### **Idea 3.2: Multi-Step Prediction (Rollouts)**
+*   **Problem:** Minimizing the one-step prediction error allows for small errors to be "fixed" at the next step. This can hide the long-term consequences of using a wrong parameter.
+*   **Solution:** Change the loss function to be the error over a multi-step "rollout."
+    1.  The GNN predicts `b`.
+    2.  Use this *single* predicted `b` to simulate the next `N` steps (e.g., N=5 or 10).
+    3.  The loss is the accumulated MSE over all `N` predicted states compared to the `N` true future states from MuJoCo.
+*   **Expected Outcome:** This makes the optimization problem much harder but forces the GNN to find a parameter that is stable and accurate over a longer time horizon, making it much more difficult to "cheat" with a non-physical value.
+
+### **Summary Table**
+
+| Category | Future Work Idea | Problem Addressed | Expected Benefit |
+| :--- | :--- | :--- | :--- |
+| **Model Fidelity** | **1.1 Higher-Fidelity Integrator (RK4)** | Systematic error from simple simulator. | Drastically reduces model mismatch, aligns error minimum with true parameter. |
+| | **1.2 Model More Physics (Friction)** | GNN compensates for unmodeled effects. | Provides a more complete physical model, isolating the target parameter. |
+| **Learning Guidance**| **2.1 Output Regularization (Variance)** | GNN learns a high-variance, bimodal distribution. | Forces the GNN to find a single, consistent parameter value. |
+| | **2.2 Constrained Output (Sigmoid)** | GNN predicts values in an unbounded range. | Enforces physical plausibility and can stabilize optimization. |
+| **Data & Exp. Design**| **3.1 Active Learning Data Generation** | Training data may lack "richness" for identifiability. | Focuses data generation on the most informative parts of the state space. |
+| | **3.2 Multi-Step Prediction Loss** | One-step error can hide long-term dynamic inaccuracies. | Forces the GNN to find a globally stable parameter, not just one good for a single step. |
+
+### **Conclusion**
+
+This project demonstrated an unsupervised GNN framework capable of learning high-fidelity predictive models of robot dynamics directly from motion data. However, the core experiments revealed that minimizing prediction error does not guarantee the identification of true physical parameters, especially when a mismatch exists between the learning environment's simplified physics and the data-generating simulator's complexity. The GNN learned to output an "effective" non-physical parameter to compensate for this mismatch, highlighting a critical challenge in simulation-to-real system identification. Future work must therefore prioritize reducing this model mismatch and guiding the learning process to ensure the identified parameters are not just mathematically optimal, but also physically meaningful.
